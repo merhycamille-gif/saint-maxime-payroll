@@ -152,6 +152,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . $back); exit;
     }
 
+    // 📅➕ (2026-11-14 «نفس الشي للإضافي: نسبة أو مقطوعة والعملتين، وعلى مين بيطبّق ملاك أو متعاقد أو موظف») قاعدة الأجر الإضافي للمدرسة لكل شهر
+    if ($act === 'apply_sup_rule' && $sid > 0) {
+        if (isSchoolYearLocked($sid, $sy)) { $_SESSION['flash_error'] = yearLockedMsg($sid, $sy); header('Location: ' . $back); exit; }
+        $parts = []; $errs = []; $yms = schoolYearYms($sy);
+        foreach ($CATS as $ck => $c) {
+            if (empty($_POST['apply'][$ck])) continue;                       // الفئة غير المؤشَّرة لا تُمسّ
+            $kind = (string)($_POST['sup_kind'][$ck] ?? 'percent'); if (!in_array($kind, ['percent', 'LBP', 'USD'], true)) $kind = 'percent';
+            $vt = $kind === 'percent' ? 'percent' : 'amount'; $cur = $kind === 'USD' ? 'USD' : 'LBP';
+            $rule = []; $bad = false;
+            foreach ($yms as $ym) {
+                $raw = trim((string)($_POST['sup'][$ck][$ym] ?? ''));
+                if ($raw === '') continue;
+                $v = numLoose($raw);
+                if ($v < 0 || ($vt === 'percent' && $v > 300)) { $bad = true; break; }
+                if ($v > 0) $rule[$ym] = ['vt' => $vt, 'amount' => $v, 'cur' => $cur];
+            }
+            if ($bad) { $errs[] = $c['fr'] . ' / ' . $c['ar'] . ' : valeur invalide / قيمة غير صالحة'; continue; }
+            $res = schoolRuleApply($db, $sid, $sy, $c['type'], $rule, !empty($_POST['with_custom'][$ck]), !empty($_POST['with_none'][$ck]));
+            $lbl = schoolRuleLabel($rule, $sy, 'fr') ?: 'aucun / بلا إضافي';
+            $parts[] = $c['fr'] . ' · ' . $c['ar'] . ' : ' . $lbl . ' — appliqué à / طُبّق على ' . $res['applied'] . ($res['paid_kept'] ? ' · 🔒 ' . $res['paid_kept'] . ' mois payés inchangés / شهراً مدفوعاً لم يتغيّر' : '')
+                     . ((empty($_POST['with_custom'][$ck]) && $res['custom']) ? ' · ' . $res['custom'] . ' valeur propre inchangée / قيمة خاصّة بملفه لم تُمسّ' : '');
+        }
+        if ($parts) $_SESSION['flash_success'] = '✅ ' . $sy . ' — Supplément / الأجر الإضافي — ' . implode(' · ', $parts);
+        elseif (!$errs) $_SESSION['flash_error'] = 'Cochez une catégorie / أشّر فئة واحدة على الأقلّ';
+        if ($errs) $_SESSION['flash_error'] = implode(' · ', $errs);
+        header('Location: ' . $back); exit;
+    }
     if ($act === 'apply_pay' && $sid > 0) {
         if (isSchoolYearLocked($sid, $sy)) { $_SESSION['flash_error'] = yearLockedMsg($sid, $sy); header('Location: ' . $back); exit; }
         $parts = []; $errs = [];
@@ -229,6 +256,13 @@ foreach ($schools as $s) {
     $i['max_sy'] = (string)$q->fetchColumn();
     $q = $db->prepare("SELECT COUNT(*) FROM monthly_salaries m JOIN employees e ON e.id = m.employee_id AND e.is_deleted = 0 WHERE e.school_id = ? AND m.school_year = ? AND m.net_salary_lbp > 0"); $q->execute([$sid, $sy]);
     $i['paid_rows_sy'] = (int)$q->fetchColumn();
+    // 📅➕ قاعدة الأجر الإضافي لكل فئة (المحفوظة أو السائدة) + مَن يتبعها/خاصّ/بلا إضافي
+    $i['sup'] = [];
+    foreach ($CATS as $ck => $c) {
+        $cr = schoolRuleCurrent($db, $sid, $sy, $c['type']); $one = $cr['rule'] ? reset($cr['rule']) : null;
+        $i['sup'][$ck] = ['rule' => $cr['rule'], 'saved' => $cr['saved'], 'kind' => $one ? ($one['vt'] === 'percent' ? 'percent' : ($one['cur'] === 'USD' ? 'USD' : 'LBP')) : 'percent',
+                          'mem' => $i['cnt'][$ck] > 0 ? schoolRuleMembers($db, $sid, $sy, $c['type'], $cr['rule']) : ['follow' => [], 'custom' => [], 'none' => []]];
+    }
     $i['users'] = $usersBySchool[$sid] ?? [];
     $i['locks'] = array_keys($locks[$sid] ?? []); sort($i['locks']);
     // التنبيهات
@@ -381,12 +415,14 @@ $kv = function (string $fr, string $ar, $val, bool $rtl = false) use ($miss) {
             <div class="sc-sec sc-pay"><h4>Paie <?= e($sy) ?> — par catégorie <i>الرواتب والنسب والنقل لكل فئة</i></h4>
                 <table class="sc-pt">
                     <tr><th></th><?php foreach ($CATS as $ck => $c): ?><th class="h-<?= $ck ?>"><?= e($c['fr']) ?><small><?= e($c['ar']) ?></small></th><?php endforeach; ?></tr>
-                    <?php foreach (['prime_fixe' => ['Supplément', 'الإضافي'], 'transport_daily' => ['Transport / jour', 'نقل يومي'], 'transport_complement' => ['Transport / mois', 'نقل شهري']] as $bt => $lb): ?>
-                    <tr><td><?= e($lb[0]) ?> <i><?= e($lb[1]) ?></i></td>
-                        <?php foreach ($CATS as $ck => $c): $p = $i['pay'][$ck][$bt] ?? null; ?>
-                        <td><?php if ($i['cnt'][$ck] === 0): ?><span class="sc-dim">—</span><?php elseif ($p): ?><b class="<?= $bt === 'prime_fixe' ? 'sc-big' : '' ?>"><?= e($p['label']) ?></b><?php if ($p['variants'] > 1 || $p['n'] < $i['cnt'][$ck]): ?><small><?= $p['n'] ?>/<?= $i['cnt'][$ck] ?><?= $p['variants'] > 1 ? ' · +' . ($p['variants'] - 1) . ' autres' : '' ?></small><?php endif; ?><?php else: ?><span class="sc-dim">—</span><?php endif; ?></td>
+                    <tr><td>Supplément <i>الإضافي</i></td>
+                        <?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; $lb_ = schoolRuleLabel($sr['rule'], $sy, 'fr'); $nf_ = count($sr['mem']['follow']); ?>
+                        <td><?php if ($i['cnt'][$ck] === 0 || $lb_ === ''): ?><span class="sc-dim">—</span><?php else: ?><b class="sc-big"><?= e($lb_) ?></b><?php if ($nf_ < $i['cnt'][$ck]): ?><small><?= $nf_ ?>/<?= $i['cnt'][$ck] ?></small><?php endif; ?><?php endif; ?></td>
                         <?php endforeach; ?></tr>
-                    <?php endforeach; ?>
+                    <tr><td>Transport / jour <i>نقل يومي</i></td>
+                        <?php foreach ($CATS as $ck => $c): $p = $i['pay'][$ck]['transport_daily'] ?? null; ?>
+                        <td><?php if ($i['cnt'][$ck] === 0 || !$p): ?><span class="sc-dim">—</span><?php else: ?><b><?= e(number_format(transportDailyLawForMonth((int)date('n'), (int)date('Y')))) ?> L.L</b><?php if ($p['n'] < $i['cnt'][$ck]): ?><small><?= $p['n'] ?>/<?= $i['cnt'][$ck] ?></small><?php endif; ?><?php endif; ?></td>
+                        <?php endforeach; ?></tr>
                     <tr><td>13e mois <i>شهر 13</i></td><?php foreach ($CATS as $ck => $c): ?><td><?= $i['cnt'][$ck] === 0 ? '<span class="sc-dim">—</span>' : ($i['m13'][$ck] === $i['cnt'][$ck] ? '<b>Oui</b>' : ($i['m13'][$ck] === 0 ? '<b>Non</b>' : '<b>' . $i['m13'][$ck] . '/' . $i['cnt'][$ck] . '</b>')) ?></td><?php endforeach; ?></tr>
                 </table>
             </div>
@@ -422,23 +458,35 @@ $kv = function (string $fr, string $ar, $val, bool $rtl = false) use ($miss) {
             </div>
             <div class="sc-save"><button class="btn btn-primary"><i class="fas fa-floppy-disk"></i> Enregistrer / حفظ</button> <button type="button" class="btn btn-light" onclick="scEdit(<?= $sid ?>, true)">Annuler / إلغاء</button></div>
         </form>
-        <?php if ($i['tot'] > 0): $locked = isSchoolYearLocked($sid, $sy); ?>
-        <form method="post" class="sc-form sc-payform" onsubmit="return scConfirmPay(this)">
-            <?= csrfField() ?><input type="hidden" name="action" value="apply_pay"><input type="hidden" name="id" value="<?= $sid ?>"><input type="hidden" name="sy" value="<?= e($sy) ?>">
-            <div class="sc-sec"><h4>Paie <?= e($sy) ?> — appliquer par catégorie <i>الرواتب: طبّق لكل فئة</i></h4>
+        <?php if ($i['tot'] > 0): $locked = isSchoolYearLocked($sid, $sy); $yms_ = schoolYearYms($sy); ?>
+        <?php // 📅➕ (2026-11-14) الأجر الإضافي لكل شهر ولكل فئة: نسبة ٪ أو مبلغ مقطوع (ل.ل / $) + «طبّق على كل الأشهر» — مرتّب بلا عجقة: جدول واحد، الأشهر سطور والفئات أعمدة ?>
+        <form method="post" class="sc-form sc-payform" onsubmit="return scConfirmSup(this)">
+            <?= csrfField() ?><input type="hidden" name="action" value="apply_sup_rule"><input type="hidden" name="id" value="<?= $sid ?>"><input type="hidden" name="sy" value="<?= e($sy) ?>">
+            <div class="sc-sec"><h4>Supplément <?= e($sy) ?> — par mois et par catégorie <i>الأجر الإضافي: لكل شهر ولكل فئة</i></h4>
                 <?php if ($locked): ?><p class="sc-note" style="color:#b45309">🔒 <?= e(yearLockedMsg($sid, $sy)) ?></p><?php else: ?>
-                <p class="sc-note">Cochez la catégorie, remplissez ce qui change. <b>Vide = inchangé · 0 = retirer.</b> La valeur remplace la ligne « toute l'année » de chaque employé de la catégorie et les salaires <?= e($sy) ?> sont recalculés (sauf les salaires transférés manuellement). <span class="ar-sub">أشّر الفئة واكتب اللي بدّك تغيّره. فارغ = ما بيتغيّر · 0 = شيل. القيمة بتنزل على كل موظفي الفئة بهالمدرسة وبيتعاد حساب رواتبهم (المنقولون يدوياً لا).</span></p>
-                <table class="sc-pt sc-ptedit">
-                    <tr><th></th><?php foreach ($CATS as $ck => $c): ?><th class="h-<?= $ck ?>"><label class="sc-check"><input type="checkbox" name="apply[<?= $ck ?>]" value="1" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>> <?= e($c['fr']) ?> (<?= $i['cnt'][$ck] ?>)<small><?= e($c['ar']) ?></small></label></th><?php endforeach; ?></tr>
-                    <tr><td>Supplément <i>الإضافي</i></td><?php foreach ($CATS as $ck => $c): $p = $i['pay'][$ck]['prime_fixe'] ?? null; ?>
-                        <td><div class="sc-in"><input class="form-control" name="pay[<?= $ck ?>][sup]" inputmode="decimal" placeholder="<?= $p ? e($p['label']) : '—' ?>" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>>
-                            <select class="form-select" name="pay[<?= $ck ?>][sup_vt]" onchange="this.nextElementSibling.style.display=this.value==='amount'?'':'none'"><option value="percent" <?= (!$p || $p['vt'] === 'percent') ? 'selected' : '' ?>>% de la base</option><option value="amount" <?= ($p && $p['vt'] === 'amount') ? 'selected' : '' ?>>Montant</option></select>
-                            <select class="form-select" name="pay[<?= $ck ?>][sup_cur]" style="<?= ($p && $p['vt'] === 'amount') ? '' : 'display:none' ?>"><option value="LBP" <?= (!$p || $p['cur'] !== 'USD') ? 'selected' : '' ?>>L.L</option><option value="USD" <?= ($p && $p['cur'] === 'USD') ? 'selected' : '' ?>>$</option></select></div></td><?php endforeach; ?></tr>
-                    <tr><td>Transport / jour (L.L) <i>نقل يومي</i></td><?php foreach ($CATS as $ck => $c): $p = $i['pay'][$ck]['transport_daily'] ?? null; ?><td><input class="form-control" name="pay[<?= $ck ?>][tj]" inputmode="numeric" placeholder="<?= $p ? e($p['label']) : '—' ?>" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>></td><?php endforeach; ?></tr>
-                    <tr><td>Transport / mois (L.L) <i>نقل شهري</i></td><?php foreach ($CATS as $ck => $c): $p = $i['pay'][$ck]['transport_complement'] ?? null; ?><td><input class="form-control" name="pay[<?= $ck ?>][tm]" inputmode="numeric" placeholder="<?= $p ? e($p['label']) : '—' ?>" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>></td><?php endforeach; ?></tr>
+                <table class="sc-pt sc-ptedit sc-sup">
+                    <tr><th></th><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; ?>
+                        <th class="h-<?= $ck ?>"><label class="sc-check"><input type="checkbox" name="apply[<?= $ck ?>]" value="1" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>> <?= e($c['fr']) ?> (<?= $i['cnt'][$ck] ?>)<small><?= e($c['ar']) ?></small></label></th><?php endforeach; ?></tr>
+                    <tr><td>Type <i>النوع</i></td><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; ?>
+                        <td><select class="form-select" name="sup_kind[<?= $ck ?>]" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>>
+                            <option value="percent" <?= $sr['kind'] === 'percent' ? 'selected' : '' ?>>% de la base / نسبة ٪</option>
+                            <option value="LBP" <?= $sr['kind'] === 'LBP' ? 'selected' : '' ?>>Montant L.L / مقطوع ل.ل</option>
+                            <option value="USD" <?= $sr['kind'] === 'USD' ? 'selected' : '' ?>>Montant $ / مقطوع $</option></select></td><?php endforeach; ?></tr>
+                    <tr class="sc-allrow"><td><b>Toute l'année</b> <i>كل أشهر السنة</i></td><?php foreach ($CATS as $ck => $c): ?>
+                        <td><div class="sc-in"><input class="form-control sc-supall" data-cat="<?= $ck ?>" inputmode="decimal" autocomplete="off" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="scSupAll(this)" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>>↓</button></div></td><?php endforeach; ?></tr>
+                    <?php foreach ($yms_ as $ym_): ?>
+                    <tr><td><?= e(monthName($ym_ % 100, 'fr')) ?> <?= intdiv($ym_, 100) ?> <i><?= e(monthName($ym_ % 100, 'ar')) ?></i></td><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; $v_ = $sr['rule'][$ym_]['amount'] ?? null; ?>
+                        <td><input class="form-control sc-supm" data-cat="<?= $ck ?>" name="sup[<?= $ck ?>][<?= $ym_ ?>]" inputmode="decimal" autocomplete="off" value="<?= $v_ === null ? '' : e($sr['kind'] === 'percent' ? nfc((float)$v_, 2, true) : number_format((float)$v_, ((float)$v_ == floor((float)$v_)) ? 0 : 2)) ?>" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>></td><?php endforeach; ?></tr>
+                    <?php endforeach; ?>
+                    <tr><td>Aussi <i>وكمان</i></td><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; ?>
+                        <td style="text-align:start"><?php if ($i['cnt'][$ck] > 0): ?>
+                            <label class="sc-check" data-n="<?= count($sr['mem']['custom']) ?>"><input type="checkbox" name="with_custom[<?= $ck ?>]" value="1" <?= count($sr['mem']['custom']) ? '' : 'disabled' ?>> <?= count($sr['mem']['custom']) ?> à valeur propre<small>اللي قيمتهم خاصّة بملفهم</small></label>
+                            <label class="sc-check" data-n="<?= count($sr['mem']['none']) ?>"><input type="checkbox" name="with_none[<?= $ck ?>]" value="1" <?= count($sr['mem']['none']) ? '' : 'disabled' ?>> <?= count($sr['mem']['none']) ?> sans supplément<small>اللي ما عندهم إضافي</small></label>
+                        <?php endif; ?></td><?php endforeach; ?></tr>
                 </table>
-                <p class="sc-note">Montants individuels, périodes (de mois à mois), 13e mois et primes exceptionnelles : <a href="<?= BASE_URL ?>pages/bulk_allowances.php?sch=<?= $sid ?>&sch_set=1&sy=<?= e($sy) ?>">Primes &amp; transport (détail)</a>. <span class="ar-sub">المبالغ الفردية والفترات وشهر 13 من صفحة المكافآت المفصّلة.</span></p>
-                <div class="sc-save"><button class="btn btn-success"><i class="fas fa-check"></i> Appliquer / طبّق</button></div>
+                <p class="sc-note">La règle s'applique aux employés de la catégorie qui la suivent (<?= e(implode(' · ', array_map(fn($ck) => $CATS[$ck]['fr'] . ' ' . count($i['sup'][$ck]['mem']['follow']), array_keys($CATS)))) ?>). Case vide = pas de supplément ce mois. Un mois payé ne change pas. Exception pour un employé : dans son dossier. <span class="ar-sub">القاعدة بتنزل على اللي ماشيين عليها بالفئة. الخانة الفاضية = بلا إضافي بهالشهر. الشهر المدفوع ما بيتغيّر. استثناء لأستاذ: من ملفه.</span></p>
+                <div class="sc-save"><button class="btn btn-success"><i class="fas fa-check"></i> Enregistrer / حفظ</button> <button type="button" class="btn btn-light" onclick="scEdit(<?= $sid ?>, true)">Annuler / إلغاء</button></div>
                 <?php endif; ?>
             </div>
         </form>
@@ -453,6 +501,24 @@ function scEdit(id, close) {
     var open = close ? false : (ed.style.display === 'none');
     ed.style.display = open ? '' : 'none'; v.style.display = open ? 'none' : '';
     if (open) ed.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+function scSupAll(btn) {
+    var inp = btn.parentNode.querySelector('.sc-supall'), v = inp.value.trim(); if (v === '') { inp.focus(); return; }
+    btn.closest('form').querySelectorAll('.sc-supm[data-cat="' + inp.getAttribute('data-cat') + '"]').forEach(function (i) { i.value = v; });
+    var cb = btn.closest('form').querySelector('[name="apply[' + inp.getAttribute('data-cat') + ']"]'); if (cb && !cb.disabled) cb.checked = true;
+}
+function scConfirmSup(f) {
+    var cats = { titulaire: 'Titulaires / ملاك', contractuel: 'Contractuels / متعاقد', employe: 'Employés / موظف' }, lines = [];
+    Object.keys(cats).forEach(function (ck) {
+        var on = f.querySelector('[name="apply[' + ck + ']"]'); if (!on || !on.checked) return;
+        var kind = f.querySelector('[name="sup_kind[' + ck + ']"]').value, unit = kind === 'percent' ? ' %' : (kind === 'USD' ? ' $' : ' L.L');
+        var vals = []; f.querySelectorAll('.sc-supm[data-cat="' + ck + '"]').forEach(function (i) { vals.push(i.value.trim() === '' ? '—' : i.value.trim() + unit); });
+        var uniq = vals.filter(function (v, i) { return vals.indexOf(v) === i; });
+        var extra = []; ['with_custom', 'with_none'].forEach(function (n) { var c = f.querySelector('[name="' + n + '[' + ck + ']"]'); if (c && c.checked) extra.push(c.parentNode.innerText.trim().replace(/\s+/g, ' ')); });
+        lines.push(cats[ck] + ' : ' + (uniq.length === 1 ? uniq[0] + ' (toute l\'année / كل السنة)' : vals.join(' · ')) + (extra.length ? '\n   + ' + extra.join(' + ') : ''));
+    });
+    if (!lines.length) { alert('Cochez une catégorie / أشّر فئة واحدة على الأقلّ'); return false; }
+    return confirm('Enregistrer le supplément et recalculer les salaires non payés ?\nحفظ الأجر الإضافي وإعادة حساب الرواتب غير المدفوعة؟\n\n' + lines.join('\n'));
 }
 function scConfirmPay(f) {
     var cats = { titulaire: 'Titulaires / ملاك', contractuel: 'Contractuels / متعاقد', employe: 'Employés / موظف' }, lines = [];

@@ -11211,8 +11211,8 @@ try {
     $hDel289 = renderPage('pages/ecoles.php', ['confirm_delete' => (string)$sid289], ['extra','aide','transport'], [], 'lbp', '2026-2027');
     $cards289 = substr_count($h289, '<div class="sc-card ');
     $okPage289 = $cards289 === $nSch289 && substr_count($h289, 'class="sc-pt"') === $nSch289 && substr_count($h289, 'action" value="save_school"') === $nSch289
-        && strpos($h289, 'id="scSearch"') !== false && strpos($h289, 'name="apply[titulaire]"') !== false && strpos($h289, 'name="pay[contractuel][sup]"') !== false && strpos($h289, 'name="pay[employe][tm]"') !== false
-        && strpos($h289, 'onsubmit="return scConfirmPay(this)"') !== false && stripos($h289, 'Fatal error') === false && stripos($h289, 'Warning:') === false
+        && strpos($h289, 'id="scSearch"') !== false && strpos($h289, 'name="apply[titulaire]"') !== false && strpos($h289, 'name="sup_kind[contractuel]"') !== false && strpos($h289, 'name="with_none[employe]"') !== false   /* (2026-11-14) فورم الرواتب صار جدول الإضافي الشهري لكل فئة؛ خانات النقل أُزيلت (النقل قانون واحد من صفحة النظام) */
+        && strpos($h289, 'onsubmit="return scConfirmSup(this)"') !== false && stripos($h289, 'Fatal error') === false && stripos($h289, 'Warning:') === false
         && strpos($hNew289, 'action" value="create_school"') !== false && substr_count($hNew289, '<div class="sc-steps">') === 1 && strpos($hNew289, 'name="create_account"') !== false
         && strpos($hDel289, 'class="card sc-confirm"') !== false && strpos($hDel289, 'action" value="toggle_active"') !== false && strpos($hDel289, 'action" value="delete_school"') === false;   // فيها موظفون ⇒ تعطيل لا حذف
     $okSrc289 = strpos($src289, "function ecolesApplyPay(PDO \$db, int \$sid, string \$type, string \$bonusType, float \$value, string \$vt, string \$cur, string \$sy): array {") !== false
@@ -11851,6 +11851,31 @@ try {
     $why309 = 'src=' . (int)$src309 . (int)$src309b . ' مضاعَف 25-26=' . $dblPaid309 . ' ثابت باقٍ=' . $fixedLeft309 . ' مضاعَفون=' . count($dbl309) . ' صمام=' . (int)$guard309 . ' أشهر نقلها فوق الملف=' . (int)$bad309 . ' | ' . (string)getSetting('heal_transport_double_20261114', '');
 } catch (Throwable $e) { $ok309 = false; $why309 = $e->getMessage(); }
 check('🚌 (2026-11-14) النقل لا يتضاعف: لا سطرَي نقل (ثابت + يومي) فاعلَين معاً + صمام النسخ يعتبر النقل عائلة واحدة + المخزّن لا يتجاوز ما بالملف', $ok309, $why309);
+
+/* 📅➕ (2026-11-14 «وعملي كمان نفس الشي للإضافي… نسبة أو مقطوعة والعملتين وكمان على مين بيطبّق ملاك أو متعاقد أو موظف») قاعدة الأجر الإضافي
+   للمدرسة لكل شهر ولكل فئة: جدول school_bonus_rules + سطور الملف (لا مسار حسابي جديد)، مَن قيمته خاصّة لا يُمسّ، الشهر المدفوع يبقى،
+   والقاعدة تُحفَظ بعد التطبيق. فحص المنطق الصِّرف (بلا كتابة): ضغط الأشهر إلى فترات + توقيع السطور. */
+try {
+    $fn310 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/functions.php')); $ec310 = (string)file_get_contents($PROJ . '/pages/ecoles.php');
+    $sy310 = '2026-2027'; $yms310 = schoolYearYms($sy310); $r310 = [];
+    foreach ($yms310 as $ym) $r310[$ym] = ['vt' => 'percent', 'amount' => $ym >= 202701 ? 70 : 60, 'cur' => 'LBP'];
+    $l310 = schoolRuleLines($r310, $sy310);
+    $all310 = []; foreach ($yms310 as $ym) $all310[$ym] = ['vt' => 'amount', 'amount' => 500, 'cur' => 'USD'];
+    $one310 = schoolRuleLines($all310, $sy310); $gap310 = $all310; unset($gap310[202612]);
+    $ok310 = count($yms310) === 12 && $yms310[0] === 202610 && $yms310[11] === 202709
+        && count($l310) === 2 && [$l310[0]['from'], $l310[0]['to'], (float)$l310[0]['amount']] === [10, 12, 60.0] && [$l310[1]['from'], $l310[1]['to'], (float)$l310[1]['amount']] === [1, 9, 70.0]
+        && count($one310) === 1 && [$one310[0]['from'], $one310[0]['to'], $one310[0]['cur'], $one310[0]['vt']] === [10, 9, 'USD', 'amount']
+        && count(schoolRuleLines($gap310, $sy310)) === 2                                                   // شهر فارغ يقسم الفترة ولا يأخذ إضافياً
+        && schoolRuleSig($one310) === schoolRuleSig([['vt' => 'amount', 'amount' => '500.00', 'cur' => 'USD', 'from' => null, 'to' => null]])   // سطر «كل السنة» بلا نافذة = 10←9
+        && schoolRuleSig($l310) !== schoolRuleSig($one310) && schoolRuleSig([]) === ''
+        && strpos($fn310, 'function schoolRuleApply(PDO $db, int $sid, string $sy, string $type, array $new, bool $withCustom = false, bool $withNone = false') !== false
+        && strpos($fn310, "if (schoolRuleSig(schoolRuleEmpLines(\$db, (int)\$id, \$sy, \$bt)) === \$newSig) continue;") !== false
+        && strpos($fn310, '// 🔒 الشهر المدفوع يبقى كما هو بالحرف') !== false && strpos($fn310, '// 🧷 القاعدة تُحفَظ **بعد** تطبيقها على الجميع') !== false
+        && strpos($ec310, "if (\$act === 'apply_sup_rule' && \$sid > 0) {") !== false && strpos($ec310, 'function scSupAll(btn)') !== false
+        && strpos($ec310, 'name="with_custom[<?= $ck ?>]"') !== false && strpos($ec310, 'name="sup_kind[<?= $ck ?>]"') !== false;
+    $why310 = 'lines=' . count($l310) . '/' . count($one310);
+} catch (Throwable $e) { $ok310 = false; $why310 = $e->getMessage(); }
+check('📅➕ (2026-11-14) الأجر الإضافي لكل شهر ولكل فئة بصفحة المدرسة (نسبة/مقطوع، ل.ل/$): الأشهر تُضغط فترات، الخاصّ لا يُمسّ، المدفوع يبقى، القاعدة تُحفَظ بعد التطبيق', $ok310, $why310);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

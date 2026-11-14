@@ -3368,6 +3368,147 @@ function healTransportCarriedToDaily20261114() {
     } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
+/* =====================================================================================================================
+ * 📅➕ (2026-11-14 «وعملي كمان نفس الشي للإضافي… نسبة أو مقطوعة والعملتين وكمان على مين بيطبّق ملاك أو متعاقد أو موظف»)
+ * قاعدة الأجر الإضافي للمدرسة: لكل مدرسة + سنة + فئة ⇒ قيمة لكل شهر (نسبة ٪ من الأساس، أو مبلغ مقطوع بالليرة أو بالدولار).
+ * الجدول school_bonus_rules يحفظ القاعدة؛ التطبيق = سطور «الأجر الإضافي» بملف كل أستاذ **يتبع القاعدة** (نفس آلية السطور والمحرّك،
+ * لا مسار حسابي جديد). مَن بملفه قيمة خاصّة (سطوره غير ما تعطيه القاعدة) لا يُمسّ إلا إذا طلب «حتى الخاصّين»، ومَن بلا إضافي لا يأخذه
+ * إلا إذا طلب «ومَن ليس عنده». الشهر المدفوع يبقى كما هو بالحرف (يُعاد كما كان بعد إعادة الحساب).
+ * ===================================================================================================================== */
+function schoolRuleEnsureTable(PDO $db): void {
+    static $done = false; if ($done) return; $done = true;
+    try { $db->exec("CREATE TABLE IF NOT EXISTS school_bonus_rules (
+        id INT AUTO_INCREMENT PRIMARY KEY, school_id INT NOT NULL, school_year VARCHAR(9) NOT NULL, employee_type VARCHAR(40) NOT NULL,
+        bonus_type VARCHAR(40) NOT NULL DEFAULT 'prime_fixe', ym INT NOT NULL, value_type VARCHAR(10) NOT NULL DEFAULT 'percent',
+        amount DECIMAL(18,4) NOT NULL DEFAULT 0, currency VARCHAR(3) NOT NULL DEFAULT 'LBP', updated_at DATETIME NULL,
+        UNIQUE KEY uq_rule (school_id, school_year, employee_type, bonus_type, ym)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); } catch (Throwable $e) {}
+}
+/** أشهر السنة الدراسية بالترتيب ⇒ [YYYYMM…] (ت1 ← أيلول) */
+function schoolYearYms(string $sy): array {
+    if (!preg_match('/^(\d{4})-(\d{4})$/', $sy, $m)) return [];
+    $o = []; foreach ([10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9] as $mm) $o[] = ($mm >= 10 ? (int)$m[1] : (int)$m[2]) * 100 + $mm;
+    return $o;
+}
+/** القاعدة المحفوظة ⇒ [ym => ['vt','amount','cur']] (فقط الأشهر التي لها قيمة > 0) · null = لا قاعدة محفوظة بعد */
+function schoolRuleGet(PDO $db, int $sid, string $sy, string $type, string $bt = 'prime_fixe'): ?array {
+    schoolRuleEnsureTable($db);
+    $q = $db->prepare("SELECT ym, value_type vt, amount, currency cur FROM school_bonus_rules WHERE school_id = ? AND school_year = ? AND employee_type = ? AND bonus_type = ?");
+    $q->execute([$sid, $sy, $type, $bt]); $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+    if (!$rows) return null;
+    $o = []; foreach ($rows as $r) if ((float)$r['amount'] > 0) $o[(int)$r['ym']] = ['vt' => (string)$r['vt'], 'amount' => (float)$r['amount'], 'cur' => (string)$r['cur']];
+    return $o;
+}
+/** القاعدة ⇒ سطور ملف (فترات متتالية بنفس القيمة): [['vt','amount','cur','from','to']] — كل السنة بقيمة واحدة = سطر واحد 10 ← 9 */
+function schoolRuleLines(array $rule, string $sy): array {
+    $lines = []; $cur = null;
+    foreach (schoolYearYms($sy) as $ym) {
+        $v = $rule[$ym] ?? null; $mm = $ym % 100;
+        $key = $v ? ($v['vt'] . '|' . round((float)$v['amount'], 4) . '|' . ($v['vt'] === 'percent' ? 'LBP' : $v['cur'])) : null;
+        if ($key !== null && $cur !== null && $cur['key'] === $key) { $cur['to'] = $mm; continue; }
+        if ($cur !== null) $lines[] = $cur;
+        $cur = $key === null ? null : ['key' => $key, 'vt' => $v['vt'], 'amount' => round((float)$v['amount'], 4), 'cur' => ($v['vt'] === 'percent' ? 'LBP' : $v['cur']), 'from' => $mm, 'to' => $mm];
+    }
+    if ($cur !== null) $lines[] = $cur;
+    return array_map(function ($l) { unset($l['key']); return $l; }, $lines);
+}
+/** توقيع سطور (للمقارنة): سطر «كل السنة» (بلا نافذة أو 10←9) = نفسه */
+function schoolRuleSig(array $lines): string {
+    $s = [];
+    foreach ($lines as $l) {
+        $f = $l['from'] ?? null; $t = $l['to'] ?? null;
+        if ($f === null || $t === null || ((int)$f === 10 && (int)$t === 9)) { $f = 10; $t = 9; }
+        $s[] = $l['vt'] . '|' . rtrim(rtrim(number_format((float)$l['amount'], 4, '.', ''), '0'), '.') . '|' . ($l['vt'] === 'percent' ? 'LBP' : $l['cur']) . '|' . (int)$f . '-' . (int)$t;
+    }
+    sort($s); return implode(';', $s);
+}
+/** سطور الأجر الإضافي الفاعلة بملف موظف لسنة ⇒ بنفس شكل schoolRuleLines */
+function schoolRuleEmpLines(PDO $db, int $empId, string $sy, string $bt = 'prime_fixe'): array {
+    $q = $db->prepare("SELECT value_type vt, amount, currency cur, start_month `from`, end_month `to` FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND bonus_type = ? AND is_active = 1 AND amount > 0");
+    $q->execute([$empId, $sy, $bt]); return $q->fetchAll(PDO::FETCH_ASSOC);
+}
+/** القيمة السائدة اليوم عند فئة (سطر واحد «كل السنة») — نقطة البداية حين لا قاعدة محفوظة: ['vt','amount','cur','n'] أو null */
+function schoolRuleDominant(PDO $db, int $sid, string $sy, string $type, string $bt = 'prime_fixe'): ?array {
+    [$yf, $yp] = yearEmploymentFilter($sy, 'e.');
+    $q = $db->prepare("SELECT b.value_type vt, b.amount, b.currency cur, COUNT(DISTINCT b.employee_id) n
+                       FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0 AND e.school_id = ? AND e.employee_type = ?" . $yf . "
+                       WHERE b.school_year = ? AND b.bonus_type = ? AND b.is_active = 1 AND b.amount > 0 AND (b.start_month IS NULL OR (b.start_month = 10 AND b.end_month = 9))
+                         AND (SELECT COUNT(*) FROM employee_bonuses x WHERE x.employee_id = b.employee_id AND x.school_year = b.school_year AND x.bonus_type = b.bonus_type AND x.is_active = 1 AND x.amount > 0) = 1
+                       GROUP BY b.value_type, b.amount, b.currency ORDER BY n DESC, b.amount DESC LIMIT 1");
+    $q->execute(array_merge([$sid, $type], $yp, [$sy, $bt]));
+    $r = $q->fetch(PDO::FETCH_ASSOC);
+    return $r ? ['vt' => (string)$r['vt'], 'amount' => (float)$r['amount'], 'cur' => (string)$r['cur'], 'n' => (int)$r['n']] : null;
+}
+/** القاعدة المعروضة: المحفوظة، وإلا السائدة على كل الأشهر (غير محفوظة بعد) ⇒ ['rule' => [ym=>…], 'saved' => bool] */
+function schoolRuleCurrent(PDO $db, int $sid, string $sy, string $type, string $bt = 'prime_fixe'): array {
+    $r = schoolRuleGet($db, $sid, $sy, $type, $bt);
+    if ($r !== null) return ['rule' => $r, 'saved' => true];
+    $d = schoolRuleDominant($db, $sid, $sy, $type, $bt); $rule = [];
+    if ($d) foreach (schoolYearYms($sy) as $ym) $rule[$ym] = ['vt' => $d['vt'], 'amount' => $d['amount'], 'cur' => $d['cur']];
+    return ['rule' => $rule, 'saved' => false];
+}
+/** أعضاء الفئة بالسنة مقسومون: يتبع القاعدة / قيمة خاصّة بملفه / بلا إضافي ⇒ ['follow' => [id…], 'custom' => [id…], 'none' => [id…]] */
+function schoolRuleMembers(PDO $db, int $sid, string $sy, string $type, array $rule, string $bt = 'prime_fixe'): array {
+    [$yf, $yp] = yearEmploymentFilter($sy);
+    $q = $db->prepare("SELECT id FROM employees WHERE is_deleted = 0 AND school_id = ? AND employee_type = ?" . $yf);
+    $q->execute(array_merge([$sid, $type], $yp));
+    $sig = schoolRuleSig(schoolRuleLines($rule, $sy)); $o = ['follow' => [], 'custom' => [], 'none' => []];
+    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $id) {
+        $el = schoolRuleEmpLines($db, (int)$id, $sy, $bt);
+        if (!$el) $o['none'][] = (int)$id; elseif ($sig !== '' && schoolRuleSig($el) === $sig) $o['follow'][] = (int)$id; else $o['custom'][] = (int)$id;
+    }
+    return $o;
+}
+/**
+ * حفظ القاعدة الجديدة وتطبيقها. $new = [ym => ['vt','amount','cur']] · $withCustom/$withNone = «حتى الخاصّين» / «ومَن ليس عنده إضافي».
+ * الأعضاء يُحدَّدون على القاعدة **السابقة** (المحفوظة أو السائدة). لكل عضو مطبَّق: سطور الإضافي بسنته تُبدَّل بسطور القاعدة ثم تُعاد سنته؛
+ * أشهره المدفوعة تُرجَع كما كانت بالحرف. بلا تغيير بالقاعدة ولا بالنطاق ⇒ لا يُمسّ أحد. يُرجع ['applied','recalc','paid_kept','custom','none','changed'].
+ */
+function schoolRuleApply(PDO $db, int $sid, string $sy, string $type, array $new, bool $withCustom = false, bool $withNone = false, string $bt = 'prime_fixe'): array {
+    schoolRuleEnsureTable($db);
+    require_once __DIR__ . '/payroll_calculator.php';
+    @set_time_limit(900); @ignore_user_abort(true);
+    $prev = schoolRuleCurrent($db, $sid, $sy, $type, $bt);
+    $mem = schoolRuleMembers($db, $sid, $sy, $type, $prev['rule'], $bt);
+    foreach ($new as $ym => $v) if ((float)($v['amount'] ?? 0) <= 0) unset($new[$ym]);
+    $newLines = schoolRuleLines($new, $sy); $newSig = schoolRuleSig($newLines);
+    $changed = $newSig !== schoolRuleSig(schoolRuleLines($prev['rule'], $sy));
+    $targets = $mem['follow'];
+    if ($withCustom) $targets = array_merge($targets, $mem['custom']);
+    if ($withNone) $targets = array_merge($targets, $mem['none']);
+    $out = ['applied' => 0, 'recalc' => 0, 'paid_kept' => 0, 'custom' => count($mem['custom']), 'none' => count($mem['none']), 'changed' => $changed];
+    $off = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type = ? AND is_active = 1");
+    $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?,?,?,?,?,?,?,?,?,1)");
+    $paidSel = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_paid,0) = 1");
+    foreach (array_unique($targets) as $id) {
+        if (schoolRuleSig(schoolRuleEmpLines($db, (int)$id, $sy, $bt)) === $newSig) continue;   // ملفه أصلاً على القاعدة الجديدة
+        $paidSel->execute([$id, $sy]); $paidRows = $paidSel->fetchAll(PDO::FETCH_ASSOC);
+        $off->execute([$id, $sy, $bt]); $pn = 0;
+        foreach ($newLines as $l) { $pn++; $ins->execute([$id, $bt, $pn, $sy, $l['amount'], $l['vt'], $l['cur'], $l['from'], $l['to']]); }
+        if (recalcEmployeeYear((int)$id, $sy) > 0) $out['recalc']++;
+        foreach ($paidRows as $pr) {                                                        // 🔒 الشهر المدفوع يبقى كما هو بالحرف
+            $pid = (int)$pr['id']; unset($pr['id']);
+            $set = implode(', ', array_map(fn($c) => "`$c` = :$c", array_keys($pr)));
+            $db->prepare("UPDATE monthly_salaries SET $set WHERE id = :__id")->execute($pr + ['__id' => $pid]); $out['paid_kept']++;
+        }
+        $out['applied']++;
+    }
+    // 🧷 القاعدة تُحفَظ **بعد** تطبيقها على الجميع: لو انقطع الشغل بالنصّ تبقى القاعدة القديمة هي المرجع، وإعادة الحفظ تكمل الباقين
+    //    (سطر لكل شهر من السنة — صفر = لا إضافي بذلك الشهر)
+    $db->prepare("DELETE FROM school_bonus_rules WHERE school_id = ? AND school_year = ? AND employee_type = ? AND bonus_type = ?")->execute([$sid, $sy, $type, $bt]);
+    $insR = $db->prepare("INSERT INTO school_bonus_rules (school_id, school_year, employee_type, bonus_type, ym, value_type, amount, currency, updated_at) VALUES (?,?,?,?,?,?,?,?,NOW())");
+    foreach (schoolYearYms($sy) as $ym) { $v = $new[$ym] ?? null; $insR->execute([$sid, $sy, $type, $bt, $ym, $v ? $v['vt'] : 'percent', $v ? round((float)$v['amount'], 4) : 0, $v ? ($v['vt'] === 'percent' ? 'LBP' : $v['cur']) : 'LBP']); }
+    if (function_exists('logAudit')) logAudit('school_bonus_rule', 'school_bonus_rules', $sid, ['rule' => $prev['rule'], 'saved' => $prev['saved']], ['sy' => $sy, 'type' => $type, 'bt' => $bt, 'rule' => $new, 'with_custom' => $withCustom, 'with_none' => $withNone, 'result' => $out]);
+    return $out;
+}
+/** وصف قصير للقاعدة للعرض: «55 %» أو «55 % ← 60 % (من شباط)» */
+function schoolRuleLabel(array $rule, string $sy, string $lang = 'fr'): string {
+    $lines = schoolRuleLines($rule, $sy); if (!$lines) return '';
+    $fmt = fn($l) => $l['vt'] === 'percent' ? (nfc((float)$l['amount'], 2, true) . ' %') : (number_format((float)$l['amount'], ((float)$l['amount'] == floor((float)$l['amount'])) ? 0 : 2) . ($l['cur'] === 'USD' ? ' $' : ' L.L'));
+    if (count($lines) === 1 && (int)$lines[0]['from'] === 10 && (int)$lines[0]['to'] === 9) return $fmt($lines[0]);
+    $p = []; foreach ($lines as $l) $p[] = $fmt($l) . ' (' . monthName((int)$l['from'], $lang, true) . ((int)$l['from'] !== (int)$l['to'] ? '–' . monthName((int)$l['to'], $lang, true) : '') . ')';
+    return implode(' · ', $p);
+}
+
 function healAlineVille20260824() {
     try {
         if (getSetting('heal_aline_ville_20260824', '') !== '') return;
