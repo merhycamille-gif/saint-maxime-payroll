@@ -351,20 +351,23 @@ check('⚖️ تقرير المخالفات: الوحدة + الجدول الذ�
       && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'pages/compliance.php') !== false
       && strpos($fnSrcDup, "complianceLogAuto(\$db, 'dup_percent'") !== false,
       'items=' . count($cpItems) . ' rules=' . implode(',', array_unique(array_column($cpItems, 'rule'))));
-check('المحرّك: الصافي داون للألف (قراره 2026-09-04) والمستحق = الصافي + العائلي + النقل، المحسومات القانونية كما كانت + الشفاء الذاتي للمخزّن بكل السنوات نُفِّذ',
+check('المحرّك: الصافي بالليرة كما هو = الإجمالي − المحسومات (قراره 2026-11-15 — ألغى «للألف» 2026-09-04) والمستحق = الصافي + العائلي + النقل، المحسومات القانونية كما كانت + الشفاء الذاتي للمخزّن بكل السنوات نُفِّذ + لا تنزيل للألف بأيّ مسار',
       strpos($pcSrcFl, '$cnssAmount        = round($cnssAmount);') !== false   // المحسومات القانونية كما كانت
       && strpos($pcSrcFl, '$monthlyTax        = round($monthlyTax);') !== false
       && strpos($pcSrcFl, '$totalRetenues = $cnssAmount + $caisseAmount + $monthlyTax + $eocGradeDeduction;') !== false
-      && strpos($pcSrcFl, '$netSalary = floor(($grossEarnings - $totalRetenues) / 1000) * 1000;') !== false // قراره «للألف»
+      && strpos($pcSrcFl, '$netSalary = $grossEarnings - $totalRetenues;') !== false // قراره 2026-11-15: بالليرة كما هو
+      && strpos($pcSrcFl, '/ 1000) * 1000') === false // لا تنزيل للألف بأيّ مسار بالمحرّك
       && strpos($pcSrcFl, '$totalDue = floor($netSalary + $familyAllowance + $transportComp);') !== false
-      && strpos($pcSrcFl, "(int)(floor(((int)\$r['net_salary_lbp'] + \$dNet) / 1000) * 1000)") !== false // مسار الترميم للمنقولين كذلك
+      && strpos($pcSrcFl, "\$newNet = max(0, (int)\$r['net_salary_lbp'] + (int)\$dNet);") !== false // مسار الترميم للمنقولين كذلك
       // الشفاء الذاتي للمخزّن من 2026-2027 فصاعداً + موصول بالهيدر + بعد تنفيذه محلياً لا صافي بفراطات ألف بهذه السنوات
-      && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), "function healNetFloor1000_20260904()") !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), "healNetFloor1000_20260904();") !== false
-      && strpos((string)getSetting('heal_net_floor1000_all_20260904', ''), 'done') === 0
-      && (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE is_calculated=1 AND (net_salary_lbp % 1000) <> 0")->fetchColumn() === 0
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), "function healNetExact_20261115()") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), "healNetFloor1000_20260904") === strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), "healNetFloor1000_20260904 أُزيل") // الشفاء القديم (للألف) أُزيل
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), "healNetExact_20261115(); healNetMathRows();") !== false // قبل healNetMathRows
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), "healNetFloor1000_20260904") === false
+      && strpos((string)getSetting('heal_net_exact_20261115', ''), 'done') === 0
+      && (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE ((base_plus_echelon_lbp + extra_lbp + prime_fixe_lbp + aide_complementaire_lbp) - total_retenues_lbp - net_salary_lbp) BETWEEN 1 AND 999")->fetchColumn() === 0 // لا صافٍ منزَّل للألف بأيّ سنة
       && (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE is_calculated=1 AND total_due_lbp <> net_salary_lbp + family_allowance_lbp + transport_lbp")->fetchColumn() === 0
-      && strpos((string)file_get_contents(__DIR__ . '/../includes/data_audit.php'), "NOT BETWEEN -1 AND 999") !== false // الفحص الرسمي يقبل التنزيل للألف
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/data_audit.php'), "NOT BETWEEN -1 AND 1 ") !== false && strpos((string)file_get_contents(__DIR__ . '/../includes/data_audit.php') . (string)file_get_contents(__DIR__ . '/../includes/compliance.php'), "% 1000") === false // الفحص الرسمي وتقرير المخالفات: الصافي بالليرة
       && strpos($pcSrcFl, "'net_salary_lbp' => (int)\$netSalary,") !== false
       && !preg_match("/'[a-z_0-9]+_lbp' => round\(/", $pcSrcFl));
 // (2026-09-04) بطلب المستخدم (p1: كشف برنامجه القديم بخط Arial): خط التقارير والقسائم والورقة
@@ -2274,7 +2277,7 @@ try {
     } else {
         // 🧮 (2026-09-17) بلا فجوة (العمود مسجَّل بالملف أصلاً): تغيّر الإضافي يعيد حساب الشهر بقلب المحرّك — المحسومات تتبع الإجمالي والأرقام تركب
         $okNet33 = $a33r && (int)$a33r['total_retenues_lbp'] === (int)$a33r['cnss_amount_lbp'] + (int)$a33r['income_tax_lbp'] + (int)$a33r['caisse_amount_lbp'] + (int)$a33r['eoc_grade_lbp']
-            && (int)$a33['net_salary_lbp'] === (int)floor(((int)$b33['base_plus_echelon_lbp'] + 50000000 - (int)$a33r['total_retenues_lbp']) / 1000) * 1000
+            && (int)$a33['net_salary_lbp'] === (int)$b33['base_plus_echelon_lbp'] + 50000000 - (int)$a33r['total_retenues_lbp']
             && (int)$a33['total_due_lbp'] === (int)$a33['net_salary_lbp'] + (int)$a33r['family_allowance_lbp'] + (int)$a33['transport_lbp']
             && (int)$a33r['total_retenues_lbp'] !== (int)$b33['total_retenues_lbp']; // المحسومات تحرّكت مع الإجمالي فعلاً
     }
@@ -4169,8 +4172,8 @@ check('النجاة: كشف تشرين الأول 2025 للمتعاقدين ال
       (int)$c74['n'] === 13 && (float)$c74['due'] === 899810000.0 && (float)$c74['net'] === 791810000.0
       && (float)$c74['tr'] === 108000000.0 && (float)$c74['tax'] === 9410000.0 && (float)$c74['cnss'] === 24780000.0,
       "n={$c74['n']} due={$c74['due']}");
-check('النجاة: كشف تشرين الأول 2025 للموظفين الخاضعين = كشفه القديم بالمليم (6 موظفين، صافي 166,995,000 + نقل 54,000,000 = مجموع 220,995,000، ضريبة 0 — الصافي داون للألف 2026-09-04)',
-      (int)$e74['n'] === 6 && (float)$e74['due'] === 220995000.0 && (float)$e74['net'] === 166995000.0
+check('النجاة: كشف تشرين الأول 2025 للموظفين الخاضعين = كشفه القديم بالمليم (6 موظفين، صافي 166,995,200 + نقل 54,000,000 = مجموع 220,995,200، ضريبة 0 — الصافي بالليرة كما هو 2026-11-15)',
+      (int)$e74['n'] === 6 && (float)$e74['due'] === 220995200.0 && (float)$e74['net'] === 166995200.0
       && (float)$e74['tr'] === 54000000.0 && (float)$e74['tax'] === 0.0,
       "n={$e74['n']} due={$e74['due']}");
 $who74 = function (string $first, string $last) use ($db, $naj74) {
@@ -4261,16 +4264,16 @@ $ritaM75 = $who75('ريتا', 'مارون', 'حليحل'); $mariaE75 = $who75('�
 $rr75 = $db->query("SELECT COUNT(*) n, SUM(net_salary_lbp) s, MAX(prime_fixe_lbp) p FROM monthly_salaries WHERE employee_id=" . (int)$ritaM75['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetch();
 $mm75 = $db->query("SELECT COUNT(*) n, SUM(net_salary_lbp) s, MAX(prime_fixe_lbp) p FROM monthly_salaries WHERE employee_id=" . (int)$mariaE75['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetch();
 // 🔄 (2026-09-10 «دايما طبّق القانون بكل البرنامج» + «أكيد كلهم 65»): القفل صار على القانون لا على الكشف القديم —
-//    ريتا: نسبة 65٪ (80م تشرين→كانون ثم 86م من كانون 2026 بدرجة 26) مجموع الصافي 932,532,000؛ ماريا: 65٪ (53م ثم 61م من كانون بدرجة 16) مجموع 656,026,000
+//    ريتا: نسبة 65٪ (80م تشرين→كانون ثم 86م من كانون 2026 بدرجة 26) مجموع الصافي 932,532,000؛ ماريا: 65٪ (53م ثم 61م من كانون بدرجة 16) مجموع 656,033,560
 //    (2026-09-11: صندوقها صار يشمل الأجر الإضافي بقراره بتقرير المخالفات eoc_base_only — 3,262,500 بتشرين = كشفه القديم).
-check('عبرا: ريتا مارون حليحل وماريا الياس حليحل بالقانون (65٪ + درجات كانون 2026 + صندوق ماريا يشمل الإضافي): ريتا صافي السنة 932,599,000 (بعد ضبطه توقيت درجتها أونلاين 2026-09-11) وإضافي حتى 86م · ماريا 656,026,000 وإضافي حتى 61م',
-      (int)$rr75['n'] === 12 && (float)$rr75['s'] === 932599000.0 && (float)$rr75['p'] === 86000000.0
-      && (int)$mm75['n'] === 12 && (float)$mm75['s'] === 656026000.0 && (float)$mm75['p'] === 61000000.0,
+check('عبرا: ريتا مارون حليحل وماريا الياس حليحل بالقانون (65٪ + درجات كانون 2026 + صندوق ماريا يشمل الإضافي): ريتا صافي السنة 932,605,872 (بعد ضبطه توقيت درجتها أونلاين 2026-09-11) وإضافي حتى 86م · ماريا 656,033,560 وإضافي حتى 61م',
+      (int)$rr75['n'] === 12 && (float)$rr75['s'] === 932605872.0 && (float)$rr75['p'] === 86000000.0
+      && (int)$mm75['n'] === 12 && (float)$mm75['s'] === 656033560.0 && (float)$mm75['p'] === 61000000.0,
       "ريتا s={$rr75['s']} p={$rr75['p']} ماريا s={$mm75['s']} p={$mm75['p']}");
 $vio75 = $who75('فيوليت', 'جميل', 'الحمصي'); $ter75 = $who75('تريز', 'جوزيف', 'حبقوق');
 check('عبرا: فيوليت الحمصي وتريز حبقوق «اساتذة تعاقد» بقراره — الفئة متعاقد والأرقام المخزّنة بلا مسّ + الشفاء موصول بالهيدر',
       $vio75['employee_type'] === 'enseignant_contractuel' && $ter75['employee_type'] === 'enseignant_contractuel'
-      && (float)$db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id=" . (int)$vio75['id'] . " AND year=2025 AND month=10")->fetchColumn() === 76709000.0
+      && (float)$db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id=" . (int)$vio75['id'] . " AND year=2025 AND month=10")->fetchColumn() === 76709250.0
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraFixes20260827') !== false);
 // كشف متعاقدي وموظفي عبرا (a1..a4): 52/52 مطابقون — بعد حذف غير الخاضعين بقراره،
 // مجموع تشرين لغير الملاك = سطر مجموع كشفه بالمليم + تقسيم فيوليت/تريز على الكشف
@@ -4281,9 +4284,9 @@ $cw75 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, C
 // 🔒 (2026-11-02 قراره ب: الأشهر المدفوعة 2025-2026 ثابتة) المرجع المجمَّد بعد إرجاع عيف عيد 1815 من نسخة 20/8 (كان صافيه 970,000 بخطأ 21/9):
 //    52 شخصاً، صافي 2,029,397,000. ملاحظة موثَّقة: كشفه القديم (27/8) كان 2,063,537,000 — الفارق 34,140,000 لم يُفكّ (لا نسخة صفّية للكشف القديم)؛ أي تغيّر لاحق = فشل
 // ➕ (2026-11-14 قراره «مرسال سلوم حطّها تاكسابل كمان 2025-2026»): مرسال مطانيوس سلوم #1576 (موظفة، كانت غير تاكسابل ببرنامجه ومحذوفة 10/10)
-//    رجعت بسنة 2025-2026: +1 شخص، +27,160,000 صافٍ (28,000,000 − ضمان 840,000)، +9,000,000 نقل ⇒ 53 / 2,056,557,000 / 385,200,000
-check('عبرا: كشف تشرين 2025 للمتعاقدين والموظفين (الفئة بشهر الكشف) = المرجع المجمَّد 2026-11-02 + مرسال سلوم بقراره 2026-11-14: 53 شخصاً، صافي 2,056,557,000، نقل 385,200,000 — لا يتغيّر بعد اليوم',
-      (int)$cw75['n'] === 53 && (float)$cw75['net'] === 2056557000.0 && (float)$cw75['tr'] === 385200000.0,
+//    رجعت بسنة 2025-2026: +1 شخص، +27,160,000 صافٍ (28,000,000 − ضمان 840,000)، +9,000,000 نقل ⇒ 53 / 2,056,563,770 / 385,200,000
+check('عبرا: كشف تشرين 2025 للمتعاقدين والموظفين (الفئة بشهر الكشف) = المرجع المجمَّد 2026-11-02 + مرسال سلوم بقراره 2026-11-14: 53 شخصاً، صافي 2,056,563,770، نقل 385,200,000 — لا يتغيّر بعد اليوم',
+      (int)$cw75['n'] === 53 && (float)$cw75['net'] === 2056563770.0 && (float)$cw75['tr'] === 385200000.0,
       "n={$cw75['n']} net={$cw75['net']} tr={$cw75['tr']}");
 $terSplit75 = $db->query("SELECT base_plus_echelon_lbp be, prime_fixe_lbp p, net_salary_lbp nt FROM monthly_salaries WHERE employee_id=" . (int)$ter75['id'] . " AND year=2025 AND month=10")->fetch();
 $vioSplit75 = $db->query("SELECT base_plus_echelon_lbp be, prime_fixe_lbp p, net_salary_lbp nt FROM monthly_salaries WHERE employee_id=" . (int)$vio75['id'] . " AND year=2025 AND month=10")->fetch();
@@ -4291,7 +4294,7 @@ $bilal75 = $who75('بلال', 'علي', 'اسعد');
 $bilalRows75 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=" . (int)$bilal75['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetchColumn();
 check('عبرا: تقسيم تريز 2,600,000+100م وفيوليت 2,225,000+78م متل كشفه والصافي ما تغيّر + غير الخاضعين انشالوا (بلال اسعد بلا أشهر) + الشفاء موصول',
       (float)$terSplit75['be'] === 2600000.0 && (float)$terSplit75['p'] === 100000000.0 && (float)$terSplit75['nt'] === 97518000.0
-      && (float)$vioSplit75['be'] === 2225000.0 && (float)$vioSplit75['p'] === 78000000.0 && (float)$vioSplit75['nt'] === 76709000.0
+      && (float)$vioSplit75['be'] === 2225000.0 && (float)$vioSplit75['p'] === 78000000.0 && (float)$vioSplit75['nt'] === 76709250.0
       && $bilalRows75 === 0
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraCw20260827') !== false,
       "تريز={$terSplit75['be']}/{$terSplit75['p']} بلال=$bilalRows75");
@@ -4321,9 +4324,9 @@ $bech76 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة
 $bcw76 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
     WHERE e.school_id=$bech76 AND e.is_deleted=0 AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();   // 📅 الفئة بشهر الكشف (2026-11-02)
-check('البشارة: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم (11 شخصاً، صافي 358,842,000 + نقل 82,800,000 = مجموع 441,642,000 — الصافي داون للألف) بعد حذف غير الخاضعين الأربعة بقراره',
-      (int)$bcw76['n'] === 11 && (float)$bcw76['net'] === 358842000.0
-      && (float)$bcw76['tr'] === 82800000.0 && (float)$bcw76['due'] === 441642000.0
+check('البشارة: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم (11 شخصاً، صافي 358,842,750 + نقل 82,800,000 = مجموع 441,642,750 — الصافي بالليرة كما هو 2026-11-15) بعد حذف غير الخاضعين الأربعة بقراره',
+      (int)$bcw76['n'] === 11 && (float)$bcw76['net'] === 358842750.0
+      && (float)$bcw76['tr'] === 82800000.0 && (float)$bcw76['due'] === 441642750.0
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healBecharaCw20260827') !== false,
       "n={$bcw76['n']} net={$bcw76['net']}");
 
@@ -4337,10 +4340,10 @@ $ent77 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة 
 $ecw77 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
     WHERE e.school_id=$ent77 AND e.is_deleted=0 AND e.id <> 283 AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();   // 📅 الفئة بشهر الكشف؛ جومانا بصيبص 283 كانت ملاكاً بتشرين 2025 («صارت متعاقدة» 2026-2027 بقراره 11-02)
-// ⚖️ (2026-11-09 «صحّح كل شي على القانون يا أستاذ») ضريبة سمير اعزان 155,000→230,000 وطانيوس سابا 325,500→438,000 بتشرين 2025 ⇒ الصافي 649,445,000→649,258,000 والمجموع 762,845,000→762,658,000
-check('الانتقال: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم بعد تصحيح ضريبة القانون 11-09 (17 شخصاً، صافي 649,258,000 + نقل 113,400,000 = مجموع 762,658,000 — الصافي داون للألف)',
-      (int)$ecw77['n'] === 17 && (float)$ecw77['net'] === 649258000.0
-      && (float)$ecw77['tr'] === 113400000.0 && (float)$ecw77['due'] === 762658000.0,
+// ⚖️ (2026-11-09 «صحّح كل شي على القانون يا أستاذ») ضريبة سمير اعزان 155,000→230,000 وطانيوس سابا 325,500→438,000 بتشرين 2025 ⇒ الصافي 649,445,000→649,262,910 والمجموع 762,845,000→762,662,910
+check('الانتقال: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم بعد تصحيح ضريبة القانون 11-09 (17 شخصاً، صافي 649,262,910 + نقل 113,400,000 = مجموع 762,662,910 — الصافي بالليرة كما هو 2026-11-15)',
+      (int)$ecw77['n'] === 17 && (float)$ecw77['net'] === 649262910.0
+      && (float)$ecw77['tr'] === 113400000.0 && (float)$ecw77['due'] === 762662910.0,
       "n={$ecw77['n']} net={$ecw77['net']}");
 $who77 = function (string $first, string $last) use ($db, $ent77) {
     $st = $db->prepare("SELECT e.id, e.employee_type FROM employees e WHERE e.school_id=$ent77 AND e.is_deleted=0
@@ -4372,10 +4375,10 @@ $ncw78 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, 
 $nm78 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.cnss_amount_lbp),0) cn, COALESCE(SUM(ms.transport_lbp),0) tr
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
     WHERE e.school_id=$niy78 AND e.employee_type = 'enseignant_titulaire' AND ms.year=2025 AND ms.month=10")->fetch();
-// 🔒 (2026-11-02 قراره ب) المرجع المجمَّد: 5 أشخاص صافي 255,280,000 (كشفه القديم 257,326,000 — فارق 2,046,000 عند سعدى سيدي 348: أساس الصفّ 0 منذ 20/8، لا نسخة صفّية للكشف القديم فيبقى كما قُبض)
-check('النياح: كشف تشرين 2025 للمتعاقدين والموظفين (الفئة بشهر الكشف) = المرجع المجمَّد 2026-11-02: 5 أشخاص، صافي 255,280,000 + نقل 36,000,000 — وبياره متعاقدة والملاك 17 بضمان كشفهم 46,226,550',
-      (int)$ncw78['n'] === 5 && (float)$ncw78['net'] === 255280000.0
-      && (float)$ncw78['tr'] === 36000000.0 && (float)$ncw78['due'] === 291280000.0
+// 🔒 (2026-11-02 قراره ب) المرجع المجمَّد: 5 أشخاص صافي 255,280,600 (كشفه القديم 257,326,000 — فارق 2,046,000 عند سعدى سيدي 348: أساس الصفّ 0 منذ 20/8، لا نسخة صفّية للكشف القديم فيبقى كما قُبض)
+check('النياح: كشف تشرين 2025 للمتعاقدين والموظفين (الفئة بشهر الكشف) = المرجع المجمَّد 2026-11-02: 5 أشخاص، صافي 255,280,600 + نقل 36,000,000 — وبياره متعاقدة والملاك 17 بضمان كشفهم 46,226,550',
+      (int)$ncw78['n'] === 5 && (float)$ncw78['net'] === 255280600.0
+      && (float)$ncw78['tr'] === 36000000.0 && (float)$ncw78['due'] === 291280600.0
       && (int)$nm78['n'] === 17 && (float)$nm78['cn'] === 46226550.0, "cw n={$ncw78['n']} net={$ncw78['net']} ملاك n={$nm78['n']} cn={$nm78['cn']}");
 
 /* =====================================================================
@@ -5183,15 +5186,15 @@ try {
     $oct = $rw101[10] ?? []; $jul = $rw101[7] ?? [];
     $rateOct = getExchangeRate(10, 2026);
     $expPrime = usdToLbp(550, $rateOct); $expTr = usdToLbp(5 * 4 * 4, $rateOct);
-    $expNet = floor(($expPrime - (float)$oct['total_retenues_lbp']) / 1000) * 1000;
+    $expNet = $expPrime - (float)$oct['total_retenues_lbp']; // الصافي بالليرة كما هو (2026-11-15)
     // ثم الأستاذ نفسه بعد إطفاء بنوده: صفوفه صارت مخزّنة بأساس 0 → ما زال مسموحاً (لا أساس منقول) والإعادة تُصفّر الإضافي بدل تركه عالقاً
     $db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = $rid101");
     $n2 = recalcEmployeeYear($rid101);
     $stuck = (float)$db->query("SELECT COALESCE(SUM(prime_fixe_lbp + transport_lbp), 0) FROM monthly_salaries WHERE employee_id = $rid101")->fetchColumn();
-    check('الجديد بلا أساس (تجربة حيّة ريتا101): بلا علاوة = 0 صف · مع إضافي 550 $ ونقل 5 $ = 10 أشهر: تشرين الأول أساس 0 + إضافي ' . number_format($expPrime) . ' + نقل ' . number_format($expTr) . ' + ضمان 3٪ على الإضافي + الصافي داون للألف + المستحق = الصافي + النقل · تموز بلا إضافي ولا نقل (10→6 والنافذة) · إطفاء البنود يصفّر الإضافي والنقل',
+    check('الجديد بلا أساس (تجربة حيّة ريتا101): بلا علاوة = 0 صف · مع إضافي 550 $ ونقل 5 $ = 10 أشهر: تشرين الأول أساس 0 + إضافي ' . number_format($expPrime) . ' + نقل ' . number_format($expTr) . ' + ضمان 3٪ على الإضافي + الصافي بالليرة + المستحق = الصافي + النقل · تموز بلا إضافي ولا نقل (10→6 والنافذة) · إطفاء البنود يصفّر الإضافي والنقل',
           $n0 === 0 && $z101 === 0 && $n1 === 10 && count($rw101) === 10
           && (float)$oct['base_plus_echelon_lbp'] === 0.0 && (float)$oct['prime_fixe_lbp'] === (float)$expPrime && (float)$oct['transport_lbp'] === (float)$expTr
-          && (float)$oct['cnss_amount_lbp'] === round($expPrime * 0.03) && (float)$oct['net_salary_lbp'] === (float)$expNet && fmod((float)$oct['net_salary_lbp'], 1000) === 0.0
+          && (float)$oct['cnss_amount_lbp'] === round($expPrime * 0.03) && (float)$oct['net_salary_lbp'] === (float)$expNet
           && (float)$oct['total_due_lbp'] === (float)$expNet + (float)$expTr
           && $jul && (float)$jul['prime_fixe_lbp'] === 0.0 && (float)$jul['transport_lbp'] === 0.0
           && $n2 === 10 && $stuck === 0.0,
@@ -5602,7 +5605,7 @@ check('سامر ابونادر: الشفاء موجود وموصول بالهي�
  * 113) 🧑‍🏫 سامر ابونادر — الجزء الثاني (2026-09-12 «بس بعد ما وصل سامر أونلاين» + «بدو يكون موجود بكل البرنامج» + قراره «1» = محي المكرّرَين):
  *      الشفاء الأوّل أعطاه 2026-2027 فقط. الثاني: بنود 2025-2026 كرفاقه (65٪ + نقل 7,200,000) + كل سنة من ترسيمه 2016-2017 حتى 2025-2026
  *      بالمحرّك (موسومة مدفوعة كرفاقه) + تدرّج تشرين 2026 + حذف ناعم للمكرّرَين الفارغين (نسخة _emp_bk_samerdup0912) — يحترم قفل السنة.
- *      متحقَّق على النسخة طبق الأصل مقابل توأمه 934 (نفس الدخول/الترسيم/الدرجة): كل سنة بالمليم؛ تشرين 2025 = 89,738,000 = كشفه؛ ملاك عبرا تشرين 2025 = 131.
+ *      متحقَّق على النسخة طبق الأصل مقابل توأمه 934 (نفس الدخول/الترسيم/الدرجة): كل سنة بالمليم؛ تشرين 2025 = 89,738,658 = كشفه؛ ملاك عبرا تشرين 2025 = 131.
  * =================================================================== */
 $fn113 = substr($fn111, strpos($fn111, 'function healSamerAllYears20260912'));
 $fn113 = substr($fn113, 0, strpos($fn113, "\nfunction ", 10) ?: null);
@@ -5624,11 +5627,11 @@ try {
         $yrs = $db->query("SELECT GROUP_CONCAT(DISTINCT school_year ORDER BY school_year) FROM monthly_salaries WHERE employee_id = $sid113")->fetchColumn();
         $oct25 = $db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id = $sid113 AND year = 2025 AND month = 10")->fetchColumn();
         $dupAct = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND id <> $sid113 AND employee_type = 'enseignant_contractuel' AND first_name_ar = 'سامر' AND last_name_ar LIKE '%نادر%' AND school_id = (SELECT school_id FROM employees WHERE id = $sid113)")->fetchColumn();
-        $ok113 = strpos((string)$yrs, '2016-2017') === 0 && strpos((string)$yrs, '2025-2026') !== false && strpos((string)$yrs, '2026-2027') !== false && (int)$oct25 === 89738000 && $dupAct === 0;
+        $ok113 = strpos((string)$yrs, '2016-2017') === 0 && strpos((string)$yrs, '2025-2026') !== false && strpos((string)$yrs, '2026-2027') !== false && (int)$oct25 === 89738658 && $dupAct === 0;
         $why113 = "emp=$sid113 years=$yrs oct2025=$oct25 dupsActive=$dupAct | " . mb_substr((string)getSetting('heal_samer_allyears_20260912', ''), 0, 160);
     }
 } catch (Throwable $e) { $why113 = $e->getMessage(); }
-check('سامر — الجزء الثاني (تجربة حيّة): موجود بكل سنة من 2016-2017 حتى 2026-2027، تشرين 2025 = 89,738,000 = كشفه، والمكرّران غير فاعلَين', $ok113, $why113);
+check('سامر — الجزء الثاني (تجربة حيّة): موجود بكل سنة من 2016-2017 حتى 2026-2027، تشرين 2025 = 89,738,658 = كشفه، والمكرّران غير فاعلَين', $ok113, $why113);
 
 /* =====================================================================
  * 112) 🚪 «انتبه بدك تحطّو بكل البرنامج» (2026-09-12): قاعدة عامّة «تاريخ ترك مستحيل» (= الولادة أو قبل دخول المدرسة) بتقرير
@@ -6743,7 +6746,7 @@ try {
         overlayStoredYearBonuses(1826, '2025-2026');
         $j = $db->query("SELECT base_plus_echelon_lbp bpe, prime_fixe_lbp pf, cnss_amount_lbp cnss, income_tax_lbp tax, total_retenues_lbp ret, net_salary_lbp net, total_due_lbp due, transport_lbp tr, family_allowance_lbp fam FROM monthly_salaries WHERE employee_id = 1826 AND year = 2026 AND month = 7")->fetch();
         $ok139 = $j && (int)$j['pf'] === 0 && (int)$j['net'] > 0 && (int)$j['ret'] < 4130000
-            && (int)$j['net'] === (int)floor(((int)$j['bpe'] - (int)$j['ret']) / 1000) * 1000
+            && (int)$j['net'] === (int)$j['bpe'] - (int)$j['ret']
             && (int)$j['due'] === (int)$j['net'] + (int)$j['fam'] + (int)$j['tr'];
         $why139 = $j ? ('تموز: أساس ' . number_format((int)$j['bpe']) . ' حسومات ' . number_format((int)$j['ret']) . ' صافي ' . number_format((int)$j['net'])) : 'صف مفقود';
     }
@@ -7354,9 +7357,9 @@ foreach ($map153 as $eid) {
     $rows = $db->query("SELECT month, base_salary_lbp b, net_salary_lbp n FROM monthly_salaries WHERE employee_id = $eid AND school_year = '2026-2027' AND base_plus_echelon_lbp > 0")->fetchAll(PDO::FETCH_ASSOC);
     $want = ((string)$e['hire_date'] >= '2026-10-01' && (int)$e['pm'] === 9) ? 9 : 12;
     if ($e['m'] !== 'direct_lbp' || (float)$e['c'] <= 0 || count($rows) !== $want) { $bad153[] = "#$eid m={$e['m']} c={$e['c']} rows=" . count($rows) . "/$want"; continue; }
-    foreach ($rows as $r) if ((int)$r['b'] !== (int)$e['c'] || (int)$r['n'] % 1000 !== 0) { $bad153[] = "#$eid m{$r['month']} b={$r['b']}≠{$e['c']} n={$r['n']}"; break; }
+    foreach ($rows as $r) if ((int)$r['b'] !== (int)$e['c'] || (int)$r['n'] <= 0) { $bad153[] = "#$eid m{$r['month']} b={$r['b']}≠{$e['c']} n={$r['n']}"; break; }
 }
-check('💵 متعاقدو عبرا بالليرة (قراره 19–20/10، مثبَّت 2026-11-02): كل ملف direct_lbp بمبلغ > 0 + أشهر 2026-2027 من الملف (أساس = المبلغ، صافي داون للألف، 12 شهراً أو 9 لأوّل سنة) — لا دولار بعد اليوم',
+check('💵 متعاقدو عبرا بالليرة (قراره 19–20/10، مثبَّت 2026-11-02): كل ملف direct_lbp بمبلغ > 0 + أشهر 2026-2027 من الملف (أساس = المبلغ، صافٍ موجب بالليرة، 12 شهراً أو 9 لأوّل سنة) — لا دولار بعد اليوم',
       $n153 >= 16 && !$bad153, "n=$n153" . ($bad153 ? ' bad=' . implode(' · ', $bad153) : ' ok'));
 
 /* =====================================================================
@@ -10036,7 +10039,7 @@ try {
         $others249 = true; foreach ($b249 as $i => $r) { if ((int)$r['month'] === 10 && (int)$r['year'] === 2026) continue; if (($o249[$i] ?? null) != $r) $others249 = false; }
         $ok249 = $oo && (int)$oo['eoc_grade_lbp'] - (int)$bo['eoc_grade_lbp'] === $half249
               && (int)$bo['taxable_base_lbp'] - (int)$oo['taxable_base_lbp'] === $half249
-              && (int)$oo['net_salary_lbp'] % 1000 === 0 && (int)$oo['net_salary_lbp'] < (int)$bo['net_salary_lbp']
+              && (int)$oo['net_salary_lbp'] < (int)$bo['net_salary_lbp']
               && $others249 && $f249 == $b249;
         $why249 = "emp=$e249 half=$half249 eocΔ=" . ((int)($oo['eoc_grade_lbp'] ?? 0) - (int)$bo['eoc_grade_lbp']) . ' others=' . ($others249 ? 'ok' : 'CHANGED') . ' restored=' . ($f249 == $b249 ? 'yes' : 'NO');
     }

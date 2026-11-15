@@ -2302,6 +2302,7 @@ function healCadreEocIncludesExtra(bool $force = false): int {
     return $n;
 }
 function healNetMathRows(): int {
+    healNetExact_20261115(); // 🔴 أوّلاً: الصافي المخزّن بالليرة (قراره 2026-11-15) — وإلا عُدّت الصفوف المنزَّلة للألف «لا تركب»
     if (!healGateOpen('heal_net_math')) return 0;
     $n = 0;
     try {
@@ -2309,8 +2310,7 @@ function healNetMathRows(): int {
         require_once __DIR__ . '/payroll_calculator.php';
         $bad = $db->query("SELECT DISTINCT ms.employee_id, ms.school_year FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
             WHERE e.is_deleted = 0 AND COALESCE(ms.is_paid, 0) = 0 AND ms.school_year >= '2025-2026'
-              AND (((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp - ms.net_salary_lbp) NOT BETWEEN -1 AND 999
-                   OR (ms.net_salary_lbp % 1000) <> 0
+              AND (((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp - ms.net_salary_lbp) NOT BETWEEN -1 AND 1 /* الصافي بالليرة كما هو (2026-11-15) */
                    OR ABS(ms.net_salary_lbp + ms.transport_lbp + COALESCE(ms.family_allowance_lbp, 0) - ms.total_due_lbp) > 1)
             LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
         if (!$bad) return 0;
@@ -8456,32 +8456,34 @@ function choosePercentLawOwn($db, $sy = '2025-2026', $dry = true) {
  * وقيم الدرجات 47-51 كلها 150,000 بالقانون (كانت 145/155/145/150/155). يصحّح الجدول ويعيد حساب سنتَي 2025-2026 و2026-2027 لمن درجته ≥ 46.5
  * (السنوات القديمة المنقولة لا تُمسّ). مرّة واحدة (فلاغ heal_scale47_20260903).
  */
-/** 🔴 «بعدو الصافي مش داون» → قراره «للألف» (2026-09-04): الصافي المخزّن يُنزَّل لأقرب ألف لتحت
- *  بكل السنوات («بكل البرنامج والسنين بدو يكون الصافي داون»)،
- *  والمستحق = الصافي المنزَّل + العائلي + النقل، ومرآتا الدولار تُحدَّثان. المحسومات القانونية لا تتغيّر.
- *  نسخة احتياطية للصفوف المتأثّرة بـ _ms_bk_netfloor0904_all قبل التعديل. يعمل مرّة واحدة (فلاغ). */
-function healNetFloor1000_20260904() {
+/** 🔴 (2026-11-15) قراره «نعم»: ألغى قرار 2026-09-04 («الصافي داون للألف») — الصافي بالليرة كما هو = الإجمالي − مجموع المحسومات،
+ *  بكل البرنامج وكل السنين بلا استثناء (كبرنامجه القديم: 51,934,772 لا 51,934,000). الشفاء: كل صفّ صافيه منزَّل (الفرق 1..999)
+ *  يرجع صافيه = الإجمالي − المحسومات، والمستحق = الصافي + العائلي + النقل، ومرآتا الدولار. المحسومات والبنود الأخرى لا تُمسّ.
+ *  نسخة للصفوف المتأثّرة بـ _ms_bk_netexact1115 قبل التعديل. مرّة واحدة (فلاغ heal_net_exact_20261115).
+ *  (الشفاء القديم healNetFloor1000_20260904 أُزيل — كان ينزّل للألف.) */
+function healNetExact_20261115() {
+    static $done = false; if ($done) return; $done = true;
     try {
-        if (strpos((string)getSetting('heal_net_floor1000_all_20260904', ''), 'done') === 0) return;
+        if (strpos((string)getSetting('heal_net_exact_20261115', ''), 'done') === 0) return;
         $db = getDB();
-        // «بكل البرنامج والسنين بدو يكون الصافي داون» (قوله بعدها 2026-09-04) → كل السنوات
-        $where = "is_calculated = 1 AND (net_salary_lbp % 1000) <> 0";
+        $where = "((base_plus_echelon_lbp + extra_lbp + prime_fixe_lbp + aide_complementaire_lbp) - total_retenues_lbp - net_salary_lbp) BETWEEN 1 AND 999";
         $n = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE $where")->fetchColumn();
         if ($n > 0) {
-            $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_netfloor0904_all LIKE monthly_salaries");
-            if (!(int)$db->query("SELECT COUNT(*) FROM _ms_bk_netfloor0904_all")->fetchColumn()) {
-                $db->exec("INSERT INTO _ms_bk_netfloor0904_all SELECT * FROM monthly_salaries WHERE $where");
+            $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_netexact1115 LIKE monthly_salaries");
+            if (!(int)$db->query("SELECT COUNT(*) FROM _ms_bk_netexact1115")->fetchColumn()) {
+                $db->exec("INSERT INTO _ms_bk_netexact1115 SELECT * FROM monthly_salaries WHERE $where");
             }
+            // MySQL يقيّم التعيينات بالترتيب ⇒ المستحق والدولار يُبنيان على الصافي الجديد
             $db->exec("UPDATE monthly_salaries SET
-                    net_salary_lbp = FLOOR(net_salary_lbp / 1000) * 1000,
-                    total_due_lbp  = FLOOR(net_salary_lbp / 1000) * 1000 + family_allowance_lbp + transport_lbp,
-                    net_salary_usd = IF(exchange_rate > 0, ROUND((FLOOR(net_salary_lbp / 1000) * 1000) / exchange_rate, 2), net_salary_usd),
-                    total_due_usd  = IF(exchange_rate > 0, ROUND((FLOOR(net_salary_lbp / 1000) * 1000 + family_allowance_lbp + transport_lbp) / exchange_rate, 2), total_due_usd)
+                    net_salary_lbp = (base_plus_echelon_lbp + extra_lbp + prime_fixe_lbp + aide_complementaire_lbp) - total_retenues_lbp,
+                    total_due_lbp  = net_salary_lbp + COALESCE(family_allowance_lbp, 0) + COALESCE(transport_lbp, 0),
+                    net_salary_usd = IF(exchange_rate > 0, ROUND(net_salary_lbp / exchange_rate, 2), net_salary_usd),
+                    total_due_usd  = IF(exchange_rate > 0, ROUND(total_due_lbp / exchange_rate, 2), total_due_usd)
                 WHERE $where");
         }
-        setSetting('heal_net_floor1000_all_20260904', 'done: rows=' . $n . ' @' . date('Y-m-d H:i'));
-    } catch (Throwable $e) {
-        try { setSetting('heal_net_floor1000_all_20260904', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+        setSetting('heal_net_exact_20261115', 'done: rows=' . $n . ' @' . date('Y-m-d H:i'));
+    } catch (Throwable $ex) {
+        try { setSetting('heal_net_exact_20261115', 'err: ' . mb_substr($ex->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
 function healScale47_20260903() {

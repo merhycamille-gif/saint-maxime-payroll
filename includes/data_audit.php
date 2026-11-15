@@ -8,6 +8,7 @@
  */
 
 function dataAuditRules(PDO $db, string $sy = '2025-2026', array $schoolIds = []): array {
+    if (function_exists('healNetExact_20261115')) healNetExact_20261115();
     $out = [];
     // 🏫 (2026-11-14 «إذا مختار مدرسة… وحتى النظام يعطيني معلومات المدرسة اللي مختارها») $schoolIds غير فارغة ⇒ الفحص على هذه المدارس فقط
     //    (كل قاعدة تمرّ بموظفين غير محذوفين e.is_deleted=0 تُحصَر بها؛ الأدوات والفحص الشامل ينادون بلا مدارس = الكل كما كان).
@@ -41,12 +42,11 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026', array $schoolIds = []
           AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id=e.id AND b.is_active=1 AND b.bonus_type='prime_fixe' AND (b.school_year IS NULL OR b.school_year=?) AND (b.value_type='percent' OR b.currency='USD' OR b.start_month IS NOT NULL))
           AND ms.prime_fixe_lbp <> t.s", [$sy, $sy, $sy]));
 
-    // 4) الأرقام تركب: الصافي = floor((الأساس+الدرجة+الإضافي+المكافأة+extra) − المحسومات، للألف) ؛ المستحق = الصافي + النقل + العائلية
-    $add('net_math', 'صافي لا يساوي (الإجمالي − المحسومات) منزَّلاً للألف أو مستحق لا يساوي (الصافي + النقل + العائلية)', $q("
+    // 4) الأرقام تركب: الصافي = (الأساس+الدرجة+الإضافي+المكافأة+extra) − المحسومات بالليرة كما هو (قراره 2026-11-15 — بلا تنزيل للألف) ؛ المستحق = الصافي + النقل + العائلية
+    $add('net_math', 'صافي لا يساوي (الإجمالي − المحسومات) أو مستحق لا يساوي (الصافي + النقل + العائلية)', $q("
         SELECT $nm nm, ms.year, ms.month FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE e.is_deleted=0 AND ms.school_year=? AND (
-              ((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp - ms.net_salary_lbp) NOT BETWEEN -1 AND 999 /* الصافي داون للألف (قراره 2026-09-04) */
-           OR (ms.net_salary_lbp % 1000) <> 0
+              ((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp - ms.net_salary_lbp) NOT BETWEEN -1 AND 1 /* الصافي بالليرة كما هو (قراره 2026-11-15) */
            OR ABS(ms.net_salary_lbp + ms.transport_lbp + COALESCE(ms.family_allowance_lbp,0) - ms.total_due_lbp) > 1)
         GROUP BY ms.employee_id", [$sy]));
 

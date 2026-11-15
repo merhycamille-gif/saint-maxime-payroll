@@ -130,6 +130,7 @@ function compliancePercentForMonth(array $rows, int $month): float {
  * كل بند: key, rule, emp_id, emp_name, school_id, school_name, sy, violation, fix, auto (تصحيح آلي متاح؟), link, data
  */
 function complianceItems(PDO $db, string $sy): array {
+    if (function_exists('healNetExact_20261115')) healNetExact_20261115();
     require_once __DIR__ . '/payroll_calculator.php'; // salaryEngineAllowed (tax_stale/active_nomonths) — لازم بالـCLI أيضاً
     $items = [];
     $sc = schoolScopeSql('e.school_id');
@@ -284,8 +285,7 @@ function complianceItems(PDO $db, string $sy): array {
             (SELECT COUNT(*) FROM monthly_salaries p WHERE p.employee_id = e.id AND p.school_year = ? AND p.month = ms.month) prev_has
         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0 AND ms.school_year = ?" . $sc . " AND (
-              ((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp - ms.net_salary_lbp) NOT BETWEEN -1 AND 999
-           OR (ms.net_salary_lbp % 1000) <> 0
+              ((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp - ms.net_salary_lbp) NOT BETWEEN -1 AND 1 /* الصافي بالليرة كما هو (قراره 2026-11-15) */
            OR ABS(ms.net_salary_lbp + ms.transport_lbp + COALESCE(ms.family_allowance_lbp,0) - ms.total_due_lbp) > 1)
         ORDER BY e.id, ms.year, ms.month", [$prevSy, $sy]) as $r) {
         $mo = (int)$r['month']; $yr = (int)$r['year'];
