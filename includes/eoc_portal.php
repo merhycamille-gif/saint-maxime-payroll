@@ -347,7 +347,7 @@ function eocFinancialRows(PDO $db, array $ids, string $code, array $data): array
         $monthly = round(($base + $extra) * EOC_RATE);
         // 🔴 نصف الراتب (الدخول في الملاك/الخيار اليدوي) ≈ نصف الأساس ⇒ عمود «نصف راتب»؛ وإلا فالمحسوم للصندوق بالشهر = درجة
         $g = round($s['grade']); $half = 0; $deg = 0;
-        if ($g > 0) { if (abs($g - $base / 2) <= 1) $half = $g; else $deg = $g; }
+        if ($g > 0) { if (abs($g - $base / 2) <= 1 || abs($g - ($base + $extra) / 2) <= 1) $half = $g; else $deg = $g; }   // 🏛️½ (2026-11-16) نصف الأساسي، أو نصف الأساسي + نصف الإضافي (خيار المدرسة/الأستاذ)
         if ($pi['special'] === '') { // بالفصل: الدرجة تلقائياً = الحالي − السابق كالمنصّة إن لم تكن بالرواتب
             if ($deg === 0 && $half === 0 && $base > $prevSal) $deg = $base - $prevSal;
         }

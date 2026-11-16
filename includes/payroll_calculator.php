@@ -456,11 +456,15 @@ class PayrollCalculator {
                 if ($inc > 0) $eocGradeDeduction += $inc;
             }
             if ($hasTit) $eocGradeDeduction += $basePlusEchelon / 2; // نصف الراتب عند الترسيم
+            // 🏛️½ (2026-11-16 خيار المدرسة/الأستاذ) مع نصف الأساسي: نصف الأجر الإضافي بشهر دخول الملاك — مطفأ افتراضياً (eocHalfExtraOn)
+            $halfExtraOn = eocHalfExtraOn($emp, (int)$this->month, (int)$this->year);
+            if ($hasTit && $halfExtraOn) $eocGradeDeduction += $extraWage / 2;
             // 🧾 (2026-10-12 طلبه «خيار بملف الأستاذ: أنا بحدّد السنة وبينحسم نصف الراتب بشهر ت1 لصندوق التعويضات متل القانون»)
             //    اختياري بالكامل: لا يعمل إلا إذا حدّد المستخدم سنة بالملف (eoc_half_salary_year)؛ تشرين الأول من تلك السنة فقط؛
             //    النصف من الأساس + الدرجة بلا إضافي (متل الترسيم)؛ لا يُحسم مرّتين إذا صادف شهر ترسيم.
             if (!$hasTit && $this->month === 10 && !empty($emp['eoc_half_salary_year']) && (int)$emp['eoc_half_salary_year'] === (int)$this->year) {
                 $eocGradeDeduction += $basePlusEchelon / 2;
+                if ($halfExtraOn) $eocGradeDeduction += $extraWage / 2;   // 🏛️½ نفس الخيار للسنة المختارة يدوياً بالملف
             }
         }
 

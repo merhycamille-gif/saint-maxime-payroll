@@ -23,7 +23,7 @@ $currentPage = 'ecoles';
 $pageTitle = 'Écoles & établissements / المدارس والمؤسسات';
 $hideExportToolbar = true;
 $db = getDB();
-ensureEmployeeFlagColumns(); saEnsureCols(); ensureYearLockTable();
+ensureEmployeeFlagColumns(); saEnsureCols(); ensureYearLockTable(); ensureEocHalfExtraColumns20261116();
 try { $db->query("SELECT caisse_number, email_sender_mode FROM schools LIMIT 1"); } catch (Throwable $e) {
     try { $db->exec("ALTER TABLE schools ADD COLUMN caisse_number VARCHAR(50) NULL"); } catch (Throwable $e2) {}
     try { $db->exec("ALTER TABLE schools ADD COLUMN email_sender_mode VARCHAR(10) NULL"); } catch (Throwable $e3) {}
@@ -100,12 +100,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'director_name' => $dirAr, 'director_name_fr' => $dirFr,
             'is_active' => isset($_POST['is_active']) ? 1 : 0,
             'email_sender_mode' => (($_POST['email_sender_mode'] ?? 'program') === 'school') ? 'school' : 'program',
+            // 🏛️½ (2026-11-16) نصف الأجر الإضافي بأوّل شهر الملاك: السنة الدراسية التي يبدأ منها (فارغ = مطفأ)
+            'eoc_half_extra_from' => preg_match('/^\d{4}-\d{4}$/', (string)($_POST['eoc_half_extra_from'] ?? '')) ? (string)$_POST['eoc_half_extra_from'] : null,
         ];
         if ($act === 'save_school' && $sid > 0) {
+            $heOld = (string)$db->query("SELECT COALESCE(eoc_half_extra_from, '') FROM schools WHERE id = " . (int)$sid)->fetchColumn();
             $set = implode(', ', array_map(fn($c) => "`$c` = :$c", array_keys($vals)));
             $db->prepare("UPDATE schools SET $set WHERE id = :id AND is_deleted = 0")->execute($vals + ['id' => $sid]);
             logAudit('update', 'schools', $sid, null, $nameFr);
             $_SESSION['flash_success'] = 'École mise à jour / تمّ تحديث المدرسة : ' . $nameFr;
+            // 🏛️½ تغيّر خيار «نصف الأجر الإضافي بأوّل شهر الملاك» ⇒ سنة دخول الملاك تُعاد لكل أستاذ يتبع خيار المدرسة (المدفوع بسنين سابقة يبقى محميّاً ويُذكر)
+            $heNew = (string)($vals['eoc_half_extra_from'] ?? '');
+            if ($heNew !== $heOld) {
+                eocHalfExtraSchoolFrom(0, true);
+                $heRes = eocHalfExtraRecalcSchool($db, $sid, $heOld, $heNew);
+                logAudit('update', 'schools', $sid, 'eoc_half_extra_from=' . ($heOld ?: '(مطفأ)'), 'eoc_half_extra_from=' . ($heNew ?: '(مطفأ)') . ' — أُعيد حساب ' . $heRes['n'] . ' أستاذاً');
+                $_SESSION['flash_success'] .= ' — ½ نصف الأجر الإضافي بأوّل شهر الملاك: ' . ($heNew !== '' ? 'من ' . $heNew : 'مطفأ') . ' · أُعيد حساب ' . $heRes['n'] . ' أستاذاً'
+                    . ($heRes['skipped'] ? ' · 🔒 أشهر مدفوعة بسنة سابقة لم تُمسّ عند: ' . implode('، ', array_slice($heRes['skipped'], 0, 8)) . ' (تُطبَّق من ملفّ الأستاذ بنعم/لا)' : '');
+            }
             header('Location: ' . $back); exit;
         }
         // ➕ مدرسة جديدة (+ حساب دخول اختياري بنفس الخطوة)
@@ -475,6 +487,19 @@ $kv = function (string $fr, string $ar, $val, bool $rtl = false) use ($miss) {
                     <div class="f"><label>E-mail <i>البريد</i></label><input class="form-control" name="email" type="email" value="<?= e((string)$s['email']) ?>"></div>
                     <div class="f"><label>E-mail expéditeur <i>المرسِل</i></label><select class="form-select" name="email_sender_mode"><option value="program" <?= ($s['email_sender_mode'] ?? 'program') !== 'school' ? 'selected' : '' ?>>Programme / إيميل البرنامج</option><option value="school" <?= ($s['email_sender_mode'] ?? '') === 'school' ? 'selected' : '' ?>>École / إيميل المدرسة</option></select></div>
                     <div class="f"><label>&nbsp;</label><label class="sc-check"><input type="checkbox" name="is_active" value="1" <?= $act ? 'checked' : '' ?>> Active <i>مفعّلة</i></label></div>
+                </div>
+            </div>
+            <?php // 🏛️½ (2026-11-16 «بصفحة المدرسة وكمان بالأستاذ» + «خيار التاريخ… ببداية السنة الدراسية اللي بتكون ت1») ?>
+            <div class="sc-sec"><h4>Caisse des indemnités — entrée au cadre <i>صندوق التعويضات — أوّل شهر دخول الملاك</i></h4>
+                <div class="sc-grid">
+                    <div class="f" style="grid-column:span 2"><label>½ du supplément en plus du ½ salaire de base <i>نصف الأجر الإضافي مع نصف الراتب الأساسي</i></label>
+                        <?php $heCur = (string)($s['eoc_half_extra_from'] ?? ''); $heY0 = (int)substr((string)currentSchoolYear(), 0, 4); $heYears = []; for ($hy_ = $heY0 + 1; $hy_ >= $heY0 - 2; $hy_--) $heYears[] = $hy_ . '-' . ($hy_ + 1); if ($heCur !== '' && !in_array($heCur, $heYears, true)) $heYears[] = $heCur; rsort($heYears); /* السنة الجارية، التالية، وسنتان قبلها (+ المخزَّنة) */ ?>
+                        <select class="form-select" name="eoc_half_extra_from">
+                            <option value="" <?= $heCur === '' ? 'selected' : '' ?>>Non — ½ salaire de base seulement / مطفأ — نصف الأساسي فقط</option>
+                            <?php foreach ($heYears as $hy): ?><option value="<?= e($hy) ?>" <?= $heCur === $hy ? 'selected' : '' ?>>Oui, à partir de <?= e($hy) ?> / مضوّى من <?= e($hy) ?> (تشرين الأوّل <?= e(substr($hy, 0, 4)) ?>)</option><?php endforeach; ?>
+                        </select>
+                        <small style="display:block;color:var(--gray-600);margin-top:4px" dir="rtl">بيمشي على كل أساتذة الملاك بالمدرسة اللي بيفوتوا بالملاك من هالسنة وطالع. وبملفّ كل أستاذ فيك تغيّرو إلو لحالو.</small>
+                    </div>
                 </div>
             </div>
             <div class="sc-save"><button class="btn btn-primary"><i class="fas fa-floppy-disk"></i> Enregistrer / حفظ</button> <button type="button" class="btn btn-light" onclick="scEdit(<?= $sid ?>, true)">Annuler / إلغاء</button></div>

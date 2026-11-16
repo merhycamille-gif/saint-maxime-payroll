@@ -474,6 +474,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'eoc_phase_id' => (int)($_POST['eoc_phase_id'] ?? 0) ?: null,
         'eoc_trainee' => isset($_POST['eoc_trainee']) ? 1 : 0,
         'eoc_contribution' => isset($_POST['eoc_contribution']) ? 1 : 0,
+        // 🏛️½ (2026-11-16) نصف الأجر الإضافي بأوّل شهر الملاك: '' يتبع المدرسة · 1 مضوّى له · 0 مطفأ له وحده (النموذج بلا الخانة ⇒ يبقى ما كان، يُحسم أدناه)
+        'eoc_half_extra' => (isset($_POST['eoc_half_extra']) && in_array((string)$_POST['eoc_half_extra'], ['0', '1'], true)) ? (int)$_POST['eoc_half_extra'] : null,
         'tax_subject' => isset($_POST['tax_subject']) ? 1 : 0,
         'apply_family_deduction' => isset($_POST['apply_family_deduction']) ? 1 : 0,
         // قائمتا نعم/كلا بالحالة العائلية (2026-09-10 جورج العموري «ما حسبلهن التنزيل») — القيمة لا isset
@@ -578,6 +580,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         if ($brK !== 'maladie' && $data['employee_type'] !== 'employe') $brPosted = 0; // العائلي ونهاية الخدمة للموظف (قانون العمل) فقط
         $data['cnss_br_' . $brK] = ($brPosted === (int)$brLawNew[$brK]) ? null : $brPosted;
     }
+    // 🏛️½ عمود اختيار الأستاذ يتركّب ذاتياً؛ نموذج بلا الخانة (hidden eoc_half_extra_present غائب) ⇒ يبقى ما كان
+    ensureEocHalfExtraColumns20261116();
+    if (!isset($_POST['eoc_half_extra_present'])) $data['eoc_half_extra'] = ($brOldRow && array_key_exists('eoc_half_extra', $brOldRow) && $brOldRow['eoc_half_extra'] !== null) ? (int)$brOldRow['eoc_half_extra'] : null;
+    try { if (!(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees' AND COLUMN_NAME = 'eoc_half_extra'")->fetchColumn()) unset($data['eoc_half_extra']); } catch (Throwable $e) { unset($data['eoc_half_extra']); }
     $brColsOk = true;
     try { foreach (['cnss_br_maladie', 'cnss_br_family', 'cnss_br_eos'] as $brC) if (!(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees' AND COLUMN_NAME = '$brC'")->fetchColumn()) $brColsOk = false; } catch (Throwable $e) { $brColsOk = false; }
     if (!$brColsOk) unset($data['cnss_br_maladie'], $data['cnss_br_family'], $data['cnss_br_eos']);
@@ -758,6 +764,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
             // 🧾 (2026-10-12) تغيّرت سنة «نصف الراتب لصندوق التعويضات» ⇒ تشرين الأول المعنيّ وحده يتبع (السنة الدراسية القديمة والجديدة)؛
             //    الأشهر المدفوعة تبقى محمية بنفس آلية recalcEmployeeYear (سؤال نعم/لا + التنبيه الأصفر)
+            // 🏛️½ (2026-11-16) تغيّر اختيار «نصف الأجر الإضافي بأوّل شهر الملاك» لهذا الأستاذ ⇒ سنة دخوله الملاك (وسنة النصف اليدوية) تُعاد له وحده
+            if (array_key_exists('eoc_half_extra', $data) && $brOldRow && (string)($brOldRow['eoc_half_extra'] ?? '') !== (string)($data['eoc_half_extra'] ?? '')) {
+                $heShown = activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear();
+                foreach (eocHalfEventYears(array_merge($brOldRow, $data)) as $heSy) { if ($heSy === $heShown) continue; try { recalcEmployeeYear($id, $heSy); } catch (Throwable $t) {} }
+            }
             if (array_key_exists('eoc_half_salary_year', $data) && (int)($oldDates['eoc_half_salary_year'] ?? 0) !== (int)($data['eoc_half_salary_year'] ?? 0)) {
                 $ehsDone = [activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()];
                 foreach ([(int)($oldDates['eoc_half_salary_year'] ?? 0), (int)($data['eoc_half_salary_year'] ?? 0)] as $ehsYy) {
@@ -2892,6 +2903,20 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                                 </div>
                                 <div style="margin-top:8px"><label><input type="checkbox" name="eoc_trainee" value="1" <?= !empty($employee['eoc_trainee']) ? 'checked' : '' ?>> متمرن / Stagiaire <small style="color:var(--gray-600)">(لا مساهمة للمدرسة بالبيان المالي)</small></label>
                                     <label style="margin-inline-start:16px"><input type="checkbox" name="eoc_contribution" value="1" <?= !empty($employee['eoc_contribution']) ? 'checked' : '' ?>> مساهمة / Contribution <small style="color:var(--gray-600)">(لا محسوم على الأستاذ)</small></label></div>
+                            </div>
+                            <?php // 🏛️½ (2026-11-16) نصف الأجر الإضافي بأوّل شهر الملاك — لهذا الأستاذ وحده: يتبع مدرسته، أو مضوّى، أو مطفأ
+                                ensureEocHalfExtraColumns20261116();
+                                $heEmp = $employee['eoc_half_extra'] ?? null; $heEmp = ($heEmp === null || $heEmp === '') ? '' : (string)(int)$heEmp;
+                                $heSch = eocHalfExtraSchoolFrom((int)($employee['school_id'] ?? 0)); ?>
+                            <div class="emp-teacher-only" style="margin-top:12px;padding-top:10px;border-top:1px dashed #fcd34d">
+                                <input type="hidden" name="eoc_half_extra_present" value="1">
+                                <label class="form-label" style="margin-bottom:4px;display:block;white-space:normal"><strong>نصف الأجر الإضافي مع نصف الأساسي بأوّل شهر الملاك</strong><br><small dir="ltr">½ du supplément à l'entrée au cadre</small></label>
+                                <select name="eoc_half_extra" class="form-select" style="max-width:420px">
+                                    <option value="" <?= $heEmp === '' ? 'selected' : '' ?>>يتبع المدرسة — <?= $heSch !== '' ? 'مضوّى من ' . e($heSch) : 'مطفأ' ?> / Selon l'école</option>
+                                    <option value="1" <?= $heEmp === '1' ? 'selected' : '' ?>>مضوّى لهذا الأستاذ / Oui pour cet enseignant</option>
+                                    <option value="0" <?= $heEmp === '0' ? 'selected' : '' ?>>مطفأ لهذا الأستاذ / Non pour cet enseignant</option>
+                                </select>
+                                <p style="font-size:12px;color:var(--gray-600);margin:6px 0 0">إذا غيّرتو هون بيتغيّر لهالأستاذ بس؛ باقي الأساتذة بيبقوا على خيار المدرسة (صفحة المدرسة).</p>
                             </div>
                             <?php // 🧾 (2026-10-12) اختياري: نصف الراتب (أساس + درجة، بلا إضافي) لصندوق التعويضات بشهر تشرين الأول من سنة يحدّدها المستخدم
                                 $ehsY = (int)($employee['eoc_half_salary_year'] ?? 0);

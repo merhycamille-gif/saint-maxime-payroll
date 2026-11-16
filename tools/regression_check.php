@@ -11484,7 +11484,7 @@ try {
     $okVal = $okVal && $okCols && $okSync && $okForms;
     // البيان العام: أساتذة السنة ملاكاً ومتعاقدين، راتب ت1، الشهادة/المرحلة من الملف، النواقص معلَّمة
     $gr = eocGeneralRows($db, [2], '2026-2027', eocDefaults('general')); $gt = eocGeneralTotals($gr); $ga = null; foreach ($gr as $r) if ($r['key'] === '191') $ga = $r;
-    $okGen = count($gr) >= 25 && $gt['staff'] >= 18 && $gt['contract'] >= 5 && $ga && (int)$ga['salary'] === 3560000 && (int)$ga['add_salary'] === 54000000 && $ga['employment_type'] === 'staff' && (int)$ga['certificate_id'] === 11 && $ga['birth_date'] === '1984-08-01' && count(array_filter($gr, fn($r) => in_array('teacher_no', $r['missing'], true) && $r['employment_type'] === 'staff')) >= 1 && eocPhaseFromNiveau('maternelle,primaire') === 10 && eocPhaseFromNiveau('intermediaire,secondaire') === 5 && eocCatFromEmp(['niveau_scolaire' => 'maternelle']) === 1;
+    $okGen = count($gr) >= 25 && $gt['staff'] >= 18 && $gt['contract'] >= 5 && $ga && (int)$ga['salary'] === 3560000 && (int)$ga['add_salary'] === 54000000 && $ga['employment_type'] === 'staff' && (int)$ga['certificate_id'] === 11 && $ga['birth_date'] === '1984-08-01' && count(array_filter($gr, fn($r) => in_array('teacher_no', $r['missing'], true) && $r['employment_type'] === 'staff')) === count(array_filter($gr, fn($r) => $r['employment_type'] === 'staff' && trim((string)$r['teacher_no']) === '')) /* (2026-11-16) كان «≥ 1 ملاك بلا رقم» — الأرقام الثلاثة الناقصة بمكسيموس أُدخلت بطلبه (زغيب/عبّود/يونس) ⇒ القاعدة: كل ملاك بلا رقم يُعلَّم ناقصاً، ولا أحد غيره */ && eocPhaseFromNiveau('maternelle,primaire') === 10 && eocPhaseFromNiveau('intermediaire,secondaire') === 5 && eocCatFromEmp(['niveau_scolaire' => 'maternelle']) === 1;
     // الصفحة بحالاتها + JSON + إكسل
     $hH = renderPage('pages/eoc_portal.php', ['tab' => 'home'], [], [2], '', '2026-2027'); $hL = renderPage('pages/eoc_portal.php', ['tab' => 'financial'], [], [2], '', '2026-2027'); $hF = renderPage('pages/eoc_portal.php', ['tab' => 'financial', 'period' => '202601'], [], [2], '', '2026-2027'); $hG = renderPage('pages/eoc_portal.php', ['tab' => 'general', 'period' => '2026-2027', 'add' => '1'], [], [2], '', '2026-2027');
     $okPg = strpos($hH, 'بوابة المدارس') !== false && strpos($hH, 'معلومات المدرسة') !== false && strpos($hH, '75210') !== false && strpos($hL, 'البيانات السابقة') !== false && strpos($hL, '>202601</span>') !== false && strpos($hL, '410,594,200') !== false
@@ -12000,6 +12000,43 @@ try {
     $why313 = legalPeriodLabel('2026-Q4', 'eoc_quarterly') . ' · ' . legalPeriodLabel('2026-Q4', 'cnss_quarterly');
 } catch (Throwable $e) { $why313 = $e->getMessage(); }
 check('🏛️ (2026-11-16) رزنامة المواعيد: فصل صندوق التعويضات بالسنة المدرسية، والمالية والضمان بالسنة الميلادية', $ok313, $why313);
+
+/* 🏛️½ 314 (2026-11-16 «نصف الأجر الإضافي كمان أوّل شهر دخول الملاك، وخيار شيلها — بصفحة المدرسة وكمان بالأستاذ، وخيار التاريخ ببداية السنة الدراسية») */
+$ok314 = false; $why314 = '';
+try {
+    ensureEocHalfExtraColumns20261116();
+    $pc314 = (string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php'); $ec314 = (string)file_get_contents(__DIR__ . '/../pages/ecoles.php'); $em314 = (string)file_get_contents(__DIR__ . '/../pages/employees.php');
+    $c314 = [];
+    $c314['cols'] = (int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = 'schools' AND COLUMN_NAME = 'eoc_half_extra_from') OR (TABLE_NAME = 'employees' AND COLUMN_NAME = 'eoc_half_extra'))")->fetchColumn() === 2;
+    // القرار: اختيار الأستاذ يغلب؛ وإلّا خيار المدرسة من سنته فطلوع (السنة الدراسية تبدأ بتشرين الأوّل)
+    $sc314 = (int)$db->query("SELECT id FROM schools WHERE is_deleted = 0 AND eoc_half_extra_from IS NULL ORDER BY id LIMIT 1")->fetchColumn();
+    $c314['rule'] = eocHalfExtraOn(['school_id' => $sc314, 'eoc_half_extra' => 1], 10, 2020) && !eocHalfExtraOn(['school_id' => $sc314, 'eoc_half_extra' => '0'], 10, 2030)
+        && !eocHalfExtraOn(['school_id' => $sc314, 'eoc_half_extra' => null], 10, 2026) && !eocHalfExtraOn(['school_id' => $sc314], 10, 2026)
+        && eocHalfEventYears(['titularization_date' => '2026-10-01', 'eoc_half_salary_year' => 2024]) === ['2026-2027', '2024-2025'] && eocHalfEventYears(['titularization_date' => null]) === [];
+    $c314['code'] = strpos($pc314, "if (\$hasTit) \$eocGradeDeduction += \$basePlusEchelon / 2;") !== false && strpos($pc314, "if (\$hasTit && \$halfExtraOn) \$eocGradeDeduction += \$extraWage / 2;") !== false
+        && strpos($pc314, "if (\$halfExtraOn) \$eocGradeDeduction += \$extraWage / 2;") !== false
+        && strpos($ec314, 'name="eoc_half_extra_from"') !== false && strpos($ec314, "eocHalfExtraRecalcSchool(\$db, \$sid, \$heOld, \$heNew)") !== false
+        && strpos($em314, 'name="eoc_half_extra"') !== false && strpos($em314, 'name="eoc_half_extra_present"') !== false
+        && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), "ensureEocHalfExtraColumns20261116();") !== false
+        && strpos((string)file_get_contents(__DIR__ . '/../includes/eoc_portal.php'), "abs(\$g - (\$base + \$extra) / 2) <= 1") !== false;
+    // المحرّك (بلا حفظ) على أستاذ ملاك له إضافي: مطفأ = كما كان بالحرف (نصف الأساسي)، مضوّى = + نصف الإضافي، مطفأ للأستاذ يغلب، وشهر آخر لا يتأثّر
+    $c314['engine'] = false; $eng314 = '';
+    $id314 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.year = 2026 AND ms.month = 10 AND ms.prime_fixe_lbp > 0 AND ms.eoc_grade_lbp = 0 WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND COALESCE(e.eoc_subject, 1) = 1 AND e.eoc_half_extra IS NULL AND e.eoc_half_salary_year IS NULL AND (e.titularization_date IS NULL OR e.titularization_date < '2026-01-01') ORDER BY e.id LIMIT 1")->fetchColumn();
+    if ($id314) {
+        $run314 = function (array $over, int $m = 10) use ($id314) { $c = new PayrollCalculator($id314, $m, 2026); $rp = new ReflectionProperty($c, 'employee'); $rp->setAccessible(true); $rp->setValue($c, array_merge($rp->getValue($c), $over)); return $c->calculate(); };
+        $n314 = $run314([]); $o314 = $run314(['eoc_half_salary_year' => 2026]); $y314 = $run314(['eoc_half_salary_year' => 2026, 'eoc_half_extra' => 1]); $z314 = $run314(['eoc_half_salary_year' => 2026, 'eoc_half_extra' => 0]); $w314 = $run314(['eoc_half_salary_year' => 2026, 'eoc_half_extra' => 1], 11);
+        $b314 = (int)$n314['base_plus_echelon_lbp']; $x314 = (int)$n314['prime_fixe_lbp'] + (int)$n314['extra_lbp'];
+        $c314['engine'] = (int)$n314['eoc_grade_lbp'] === 0 && (int)$o314['eoc_grade_lbp'] === (int)round($b314 / 2) && (int)$y314['eoc_grade_lbp'] === (int)round($b314 / 2 + $x314 / 2)
+            && (int)$z314['eoc_grade_lbp'] === (int)$o314['eoc_grade_lbp'] && (int)$z314['net_salary_lbp'] === (int)$o314['net_salary_lbp'] && (int)$w314['eoc_grade_lbp'] === 0
+            && (int)$y314['caisse_amount_lbp'] === (int)$n314['caisse_amount_lbp'] && (int)$y314['net_salary_lbp'] < (int)$o314['net_salary_lbp']
+            && (int)$y314['net_salary_lbp'] === (int)$y314['base_plus_echelon_lbp'] + (int)$y314['extra_lbp'] + (int)$y314['prime_fixe_lbp'] + (int)$y314['aide_complementaire_lbp'] - (int)$y314['total_retenues_lbp'];
+        $eng314 = '#' . $id314 . ' أساس ' . $b314 . ' إضافي ' . $x314 . ' ⇒ ' . (int)$o314['eoc_grade_lbp'] . ' / ' . (int)$y314['eoc_grade_lbp'];
+    }
+    // البيانات: الخيار مطفأ افتراضياً فلا شهر ترسيم مخزَّن يحمل أكثر من نصف الأساسي إلّا حيث ضُوّي الخيار
+    $ok314 = !in_array(false, $c314, true);
+    $why314 = implode(' ', array_map(fn($k) => $k . '=' . ($c314[$k] ? '✓' : '✗'), array_keys($c314))) . ' · ' . $eng314;
+} catch (Throwable $e) { $ok314 = false; $why314 = $e->getMessage(); }
+check('🏛️½ (2026-11-16) نصف الأجر الإضافي بأوّل شهر الملاك: خيار بصفحة المدرسة (من سنة دراسية) + خيار بملف الأستاذ يغلب · مطفأ = كما كان بالحرف', $ok314, $why314);
 
 /* ⏱️ قياس الوقت (اختياري: REG_TIMING=1) */
 if (getenv('REG_TIMING')) {

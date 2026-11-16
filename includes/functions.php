@@ -2235,6 +2235,75 @@ function healDerivedExchangeRates(bool $force = false): int {
     return $n;
 }
 /**
+ * 🏛️½ (2026-11-16 «بدّي شوف إذا منحطّ كمان ياخد نصف الأجر الإضافي أوّل شهر دخول الملاك، وإذا ما بدّي حطّها يكون عندي خيار شيلها» ·
+ *  «بصفحة المدرسة وكمان بالأستاذ… وإذا شلتها لشي أستاذ بتتشال بس لإلو» · «حطّلي خيار التاريخ وهوّي أكيد دايماً ببداية السنة الدراسية اللي بتكون ت1»).
+ *  بشهر دخول الملاك (أو تشرين الأوّل من السنة المختارة يدوياً بالملف) يُحسم لصندوق التعويضات نصف (الأساس + الدرجة) كما كان؛ ومع هذا الخيار يُضاف نصف الأجر الإضافي.
+ *  • المدرسة: schools.eoc_half_extra_from = السنة الدراسية التي يبدأ منها («2026-2027» = من تشرين الأوّل 2026)؛ فارغ = مطفأ (نصف الأساسي فقط، كما كان).
+ *  • الأستاذ: employees.eoc_half_extra = NULL يتبع مدرسته · 1 مضوّى له · 0 مطفأ له وحده.
+ *  لا شيء يتغيّر بأي رقم ما دام الخيار مطفأً. المصدر الواحد = eocHalfExtraOn.
+ */
+function ensureEocHalfExtraColumns20261116(): void {
+    static $done = false; if ($done) return; $done = true;
+    try {
+        $db = getDB();
+        foreach ([['schools', 'eoc_half_extra_from', 'VARCHAR(9) NULL DEFAULT NULL'], ['employees', 'eoc_half_extra', 'TINYINT(1) NULL DEFAULT NULL']] as [$t, $c, $def]) {
+            if (!(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$t' AND COLUMN_NAME = '$c'")->fetchColumn()) $db->exec("ALTER TABLE `$t` ADD COLUMN `$c` $def");
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+/** السنة التي يبدأ منها خيار المدرسة ('' = مطفأ). $reset = true يمسح الكاش بعد حفظ صفحة المدرسة. */
+function eocHalfExtraSchoolFrom(int $schoolId, bool $reset = false): string {
+    static $map = null;
+    if ($reset) { $map = null; return ''; }
+    if ($map === null) {
+        $map = [];
+        try { foreach (getDB()->query("SELECT id, eoc_half_extra_from f FROM schools")->fetchAll(PDO::FETCH_ASSOC) as $r) $map[(int)$r['id']] = preg_match('/^\d{4}-\d{4}$/', (string)$r['f']) ? (string)$r['f'] : ''; } catch (Throwable $e) { $map = []; }
+    }
+    return $map[$schoolId] ?? '';
+}
+/** هل يُحسم نصف الأجر الإضافي مع نصف الأساسي لهذا الأستاذ بشهر الراتب هذا؟ (اختيار الأستاذ يغلب، وإلّا خيار مدرسته من سنته فطلوع) */
+function eocHalfExtraOn(array $emp, int $month, int $year): bool {
+    $o = $emp['eoc_half_extra'] ?? null;
+    if ($o !== null && $o !== '') return (int)$o === 1;
+    $from = eocHalfExtraSchoolFrom((int)($emp['school_id'] ?? 0));
+    if ($from === '') return false;
+    $syStart = $month >= 10 ? $year : $year - 1;   // بداية السنة الدراسية لشهر الراتب
+    return $syStart >= (int)substr($from, 0, 4);
+}
+/** السنة الدراسية التي يقع فيها حسم «نصف الراتب» لأستاذ ملاك: سنة شهر دخوله الملاك، و/أو تشرين الأوّل من السنة المختارة يدوياً بملفه. */
+function eocHalfEventYears(array $emp): array {
+    $o = [];
+    $td = (string)($emp['titularization_date'] ?? '');
+    if ($td !== '' && $td !== '0000-00-00' && substr($td, 0, 4) > '1900') { $sy = schoolYearOfDate($td); if ($sy) $o[$sy] = true; }
+    $my = (int)($emp['eoc_half_salary_year'] ?? 0);
+    if ($my >= 2000) $o[$my . '-' . ($my + 1)] = true;
+    return array_keys($o);
+}
+/**
+ * بعد تغيير خيار المدرسة (من $old إلى $new، '' = مطفأ): إعادة حساب سنة «نصف الراتب» لكل أستاذ ملاك بالمدرسة يتبع خيارها (لا اختيار خاصّ بملفه)
+ * وسنته تقع من أبكر السنتين فطلوع. الأشهر المدفوعة بسنين سابقة تبقى محميّة كعادة recalcEmployeeYear (تُعلَن بـmsa_recalc_skipped). يرجع ['n' => عدد الأساتذة, 'skipped' => أسماء مَن بقيت أشهرهم المدفوعة].
+ */
+function eocHalfExtraRecalcSchool(PDO $db, int $sid, string $old, string $new): array {
+    $res = ['n' => 0, 'skipped' => []];
+    if ($old === $new) return $res;
+    require_once __DIR__ . '/payroll_calculator.php';
+    $starts = array_map(fn($s) => (int)substr($s, 0, 4), array_filter([$old, $new], fn($s) => $s !== ''));
+    if (!$starts) return $res;
+    $minStart = min($starts);
+    $st = $db->prepare("SELECT * FROM employees WHERE school_id = ? AND is_deleted = 0 AND employee_type = 'enseignant_titulaire' AND eoc_half_extra IS NULL");
+    $st->execute([$sid]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $e) {
+        $hit = false;
+        foreach (eocHalfEventYears($e) as $sy) {
+            if ((int)substr($sy, 0, 4) < $minStart) continue;
+            try { recalcEmployeeYear((int)$e['id'], $sy); $hit = true; } catch (Throwable $t) {}
+            if (!empty($GLOBALS['msa_recalc_skipped'][(int)$e['id']][$sy])) $res['skipped'][] = trim((string)($e['first_name_ar'] ?? '') . ' ' . (string)($e['last_name_ar'] ?? '')) . ' (' . $sy . ')';
+        }
+        if ($hit) $res['n']++;
+    }
+    return $res;
+}
+/**
  * 🌍⚖️ (2026-11-16 «محل ما منختار الجنسية زيد الفليبينية والأثيوبية والبنغلادش وكمان اقدر أنا اكتب الجنسية · بس نحط غير لبناني ما نحسم 8,5 ·
  *  بملفّو بمحلّ الضمان: نهاية الخدمة والمرض والأمومة والتعويضات العائلية مضوّيين أو مطفيّين حسب القانون وأنا إذا بدّي بختار ·
  *  إذا كان ذكر نحطّ الجنسيّة بصيغة المذكّر · منطبّق القانون بكل الأشهر والسنين»).
