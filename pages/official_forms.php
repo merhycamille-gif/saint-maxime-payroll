@@ -1568,9 +1568,11 @@ elseif ($form === 'teacher_card'):
     // «مركز البطريرك مكسيموس الخامس حكيم» (٣ مؤسسات) فكتب رقم صندوق المدرسة 75210 عندها،
     // فكان بيانها الفصلي يُطبَع برقم مؤسسة أخرى تحت توقيع المدير وخَتمه.
     // الرقم يُدخَل يدوياً من صفحة المدارس لكل مدرسة، والإصلاح الذاتي في healCaisseNumbers().
-    $qNames = [1=>'الفصل الأول (كانون الثاني - شباط - آذار)', 2=>'الفصل الثاني (نيسان - أيار - حزيران)',
-               3=>'الفصل الثالث (تموز - آب - أيلول)', 4=>'الفصل الرابع (تشرين الأول - تشرين الثاني - كانون الأول)'];
-    $qShort = [1=>'الفصل الأول', 2=>'الفصل الثاني', 3=>'الفصل الثالث', 4=>'الفصل الرابع'];
+    // 🏛️ (2026-11-16 قراره «صندوق التعويضات على السنة المدرسية: ت1–ك1 = الفصل الأول؛ المالية والضمان على السنة الميلادية» + «صحّح متل الموقع»):
+    //    أسماء الفصول هنا بترتيب السنة المدرسية كموقع الصندوق (202701 = الفصل الأول). المفتاح ?quarter يبقى ميلادياً (4 = ت1–ك1) فلا تتغيّر الروابط ولا الرزنامة.
+    $qNames = [4=>'الفصل الأول (تشرين الأول - تشرين الثاني - كانون الأول)', 1=>'الفصل الثاني (كانون الثاني - شباط - آذار)',
+               2=>'الفصل الثالث (نيسان - أيار - حزيران)', 3=>'الفصل الرابع (تموز - آب - أيلول)'];
+    $qShort = [4=>'الفصل الأول', 1=>'الفصل الثاني', 2=>'الفصل الثالث', 3=>'الفصل الرابع'];
     $quarter = max(1, min(4, (int)($_GET['quarter'] ?? ceil($month/3))));
     [$qy1, $qy2] = schoolYearToYears($schoolYear);
     $qm = [1=>[1,2,3], 2=>[4,5,6], 3=>[7,8,9], 4=>[10,11,12]][$quarter];
@@ -1590,6 +1592,15 @@ elseif ($form === 'teacher_card'):
         ORDER BY e.school_id, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $q->execute(array_merge($ofYearParams, [$qYear], $qm));
     $rows = $q->fetchAll();
+    // 🤝 (2026-11-16) «الراتب السابق» = قبل الدرجة — قاعدة البيان المالي بصفحة موقع الصندوق نفسها (eocFinancialRows)، لا MAX على أشهر الفصل
+    //    (كان يأخذ أساس تشرين الثاني بعد أن صارت الدرجة داخله فيطلع السابق = الحالي: الين منصور 3,560,000 بدل 3,445,000).
+    $eocPrevMap = [];
+    try {
+        require_once __DIR__ . '/../includes/eoc_portal.php';
+        foreach (eocFinancialRows($db, activeSchoolIds(), eocCodeOfMonth((int)$qYear, (int)$qm[0]), eocDefaults('financial')) as $fr) if (!empty($fr['emp_id'])) $eocPrevMap[(int)$fr['emp_id']] = (int)round((float)($fr['auto']['previous_salary'] ?? 0));
+    } catch (Throwable $e) { $eocPrevMap = []; }
+    foreach ($rows as &$rPrev) { $pv = $eocPrevMap[(int)$rPrev['id']] ?? 0; if ($pv > 0 && $pv <= (int)$rPrev['currSal']) $rPrev['prevSal'] = $pv; }
+    unset($rPrev);
     $multiS = (count(activeSchoolIds()) !== 1);
     $qMonthsLabel = implode(' - ', array_map(fn($m)=>monthName($m,'ar'), $qm));
     // نصف الراتب مقابل «مختلف/درجة»: إذا وقع تاريخ دخول الملاك ضمن هذا الفصل → المبلغ نصف راتب، وإلا فهو قسط درجة/زيادة
@@ -1599,7 +1610,7 @@ elseif ($form === 'teacher_card'):
         return ((int)date('Y', strtotime($td)) === $qYear) && in_array((int)date('n', strtotime($td)), $qm, true);
     };
     // عمود «الأجر الإضافي» يتبع زرّ «الراتب يشمل» (طلب المستخدم p1) — المحسومات نفسها تبقى المخزّنة القانونية
-    $allSpan = ($multiS ? 11 : 10) + (salaryCompHas('extra') ? 1 : 0);
+    $allSpan = ($multiS ? 12 : 11) + (salaryCompHas('extra') ? 1 : 0);
 ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="eoc_quarterly">
@@ -1618,23 +1629,23 @@ elseif ($form === 'teacher_card'):
         </div>
         <div style="text-align:left;line-height:1.7;font-size:12pt">
             <strong>بيان بالمحسومات المقتطعة ومساهمة المدرسة<br>عن أفراد الهيئة التعليمية الداخلين في الملاك</strong><br>
-            رقم الهاتف: <?= e($school['phone'] ?? '') ?: '<span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span>' ?>
+            رقم الهاتف: <?= ($school['phone'] ?? '') !== '' ? '<bdi dir="ltr">' . e($school['phone']) . '</bdi>' : '<span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span>' ?>
         </div>
     </div>
     <div style="display:flex;justify-content:space-between;font-size:12pt;margin-bottom:2px">
         <div>رقم المدرسة: <strong><?= e($school['caisse_number'] ?? '') ?: '<span style="display:inline-block;min-width:80px;border-bottom:1px dotted #475569">&nbsp;</span>' ?></strong>
-             &nbsp;&nbsp; من السنة المدرسية <strong><?= e($schoolYear) ?></strong></div>
-        <div>Page 1 Of 1</div>
+             &nbsp;&nbsp; من السنة المدرسية <strong><bdi dir="ltr"><?= e($schoolYear) ?></bdi></strong></div>
+        <div>صفحة 1 من 1</div>
     </div>
     <div style="font-size:12pt;margin-bottom:6px">عن الفصل: <strong><?= e($qShort[$quarter]) ?></strong> (<?= e($qMonthsLabel) ?>)</div>
     <table class="doc-table">
         <thead><tr>
             <?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
             <th>الرقم المالي</th><th>الاسم والشهرة</th><th>اسم الأب</th>
-            <th>الراتب الشهري<br>السابق ل.ل</th><th>الراتب الشهري<br>الحالي ل.ل</th>
-            <?php if (salaryCompHas('extra')): ?><th>الأجر<br>الإضافي ل.ل<?= extraPctHead(null, null, null, $schoolYear) ?></th><?php endif; ?>
-            <th>المحسومات<br>الشهرية ل.ل</th><th>المحسومات<br>الفصلية ل.ل</th>
-            <th>نصف<br>راتب ل.ل</th><th>مختلف، درجة<br>تمرين ل.ل</th><th>ملاحظات</th>
+            <th>الراتب السابق</th><th>الراتب الحالي</th>
+            <?php if (salaryCompHas('extra')): ?><th>الأجر الاضافي<?= extraPctHead(null, null, null, $schoolYear) ?></th><?php endif; ?>
+            <th>محسومات شهرية</th><th>محسومات فصلية</th>
+            <th>نصف راتب</th><th>درجة / مختلف</th><th>المبلغ الإضافي</th><th>ملاحظات</th>
         </tr></thead>
         <tbody>
         <?php $totPrev=0;$totCur=0;$totM=0;$totQ=0;$totHalf=0;$totMisc=0;$totEx=0; foreach ($rows as $i=>$r):
@@ -1649,11 +1660,12 @@ elseif ($form === 'teacher_card'):
                 <td><?= e(trim((string)$r['father_name_ar']) ?: (string)$r['father_name_fr']) ?></td>
                 <td class="num"><?= formatLBP($r['prevSal'],false) ?></td>
                 <td class="num"><?= formatLBP($r['currSal'],false) ?></td>
-                <?php if (salaryCompHas('extra')): ?><td class="num"><?= $exM>0?formatLBP($exM,false):'00' ?></td><?php endif; ?>
+                <?php if (salaryCompHas('extra')): ?><td class="num"><?= $exM>0?formatLBP($exM,false):'0' ?></td><?php endif; ?>
                 <td class="num"><?= formatLBP($mc,false) ?></td>
                 <td class="num"><strong><?= formatLBP($qc,false) ?></strong></td>
-                <td class="num"><?= $half>0?formatLBP($half,false):'00' ?></td>
-                <td class="num"><?= $misc>0?formatLBP($misc,false):'00' ?></td>
+                <td class="num"><?= $half>0?formatLBP($half,false):'0' ?></td>
+                <td class="num"><?= $misc>0?formatLBP($misc,false):'0' ?></td>
+                <td class="num"><?= ($half+$misc)>0?formatLBP($half+$misc,false):'0' ?></td>
                 <td>&nbsp;</td>
             </tr>
         <?php endforeach; ?>
@@ -1668,6 +1680,7 @@ elseif ($form === 'teacher_card'):
             <td class="num"><strong><?= formatLBP($totQ,false) ?></strong></td>
             <td class="num"><strong><?= formatLBP($totHalf,false) ?></strong></td>
             <td class="num"><strong><?= formatLBP($totMisc,false) ?></strong></td>
+            <td class="num"><strong><?= formatLBP($totHalf+$totMisc,false) ?></strong></td>
             <td></td>
         </tr></tfoot>
     </table>

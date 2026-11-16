@@ -891,9 +891,24 @@ check('بيان الصندوق الفصلي: ترويسة النموذج الر�
       strpos($hQ, 'بيان بالمحسومات المقتطعة ومساهمة المدرسة') !== false
       && strpos($hQ, 'لأفراد الهيئة التعليمية في المدارس الخاصة') !== false
       && strpos($hQ, 'رقم المدرسة') !== false && strpos($hQ, 'عن الفصل') !== false);
-check('بيان الصندوق الفصلي: أعمدة النموذج (اسم الأب/الإضافي/نصف راتب/مختلف درجة)',
-      strpos($hQ, 'اسم الأب') !== false && strpos($hQ, 'الأجر<br>الإضافي ل.ل') !== false
-      && strpos($hQ, 'نصف<br>راتب ل.ل') !== false && strpos($hQ, 'مختلف، درجة<br>تمرين ل.ل') !== false);
+// (2026-11-16 «صحّح متل الموقع») أسماء الأعمدة كجدول موقع الصندوق + «المبلغ الإضافي»، الفصل بالسنة المدرسية (تموز–أيلول = الرابع)، الصفر «0»، «صفحة 1 من 1»
+check('بيان الصندوق الفصلي: أعمدة النموذج (اسم الأب/الإضافي/نصف راتب/درجة مختلف/المبلغ الإضافي) كموقع الصندوق',
+      strpos($hQ, 'اسم الأب') !== false && strpos($hQ, '<th>الأجر الاضافي') !== false
+      && strpos($hQ, '<th>نصف راتب</th><th>درجة / مختلف</th><th>المبلغ الإضافي</th>') !== false && strpos($hQ, '<th>الراتب السابق</th><th>الراتب الحالي</th>') !== false
+      && strpos($hQ, 'عن الفصل: <strong>الفصل الرابع</strong>') !== false && strpos($hQ, 'صفحة 1 من 1') !== false && strpos($hQ, 'Page 1 Of 1') === false
+      && strpos($hQ, '<td class="num">00</td>') === false && strpos($hQ, '<bdi dir="ltr">') !== false);
+// الراتب السابق = قبل الدرجة (قاعدة البيان المالي بصفحة موقع الصندوق نفسها) + ت1–ك1 = «الفصل الأول»
+$hQ4 = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 4], ['extra', 'aide', 'transport'], [2], 'lbp', '2026-2027');
+$okQ4 = false; $whyQ4 = '';
+try {
+    require_once __DIR__ . '/../includes/eoc_portal.php';
+    $finQ4 = eocFinancialRows($db, [2], '202701', eocDefaults('financial')); $nQ4 = 0; $missQ4 = [];
+    foreach ($finQ4 as $fq) { $pa = (int)$fq['auto']['previous_salary']; $ca = (int)$fq['auto']['current_salary']; if ($pa >= $ca) continue; $nQ4++;
+        if (strpos($hQ4, '<td class="num">' . formatLBP($pa, false) . '</td>' ) === false) $missQ4[] = $fq['teacher_name'] . ' ' . $pa; }
+    $okQ4 = strpos($hQ4, 'عن الفصل: <strong>الفصل الأول</strong>') !== false && strpos($hQ4, 'الفصل الرابع (تشرين الأول') === false && $nQ4 > 0 && !$missQ4;
+    $whyQ4 = 'بدرجة=' . $nQ4 . ($missQ4 ? ' ناقص: ' . implode('، ', array_slice($missQ4, 0, 4)) : '');
+} catch (Throwable $e) { $whyQ4 = $e->getMessage(); }
+check('🏛️ (2026-11-16) بيان الصندوق الفصلي: ت1–ك1 = «الفصل الأول» (السنة المدرسية) + الراتب السابق قبل الدرجة كالبيان المالي بصفحة الموقع', $okQ4, $whyQ4);
 check('بيان الصندوق الفصلي: خلاصة المقتطعة + مساهمة المدرسة + المجموع العام + المادة 6',
       strpos($hQ, 'المحسومات المقتطعة') !== false && strpos($hQ, 'مساهمة المدرسة') !== false
       && strpos($hQ, 'المجموع العام') !== false && strpos($hQ, 'المرسوم الاشتراعي رقم 47') !== false
@@ -1752,8 +1767,8 @@ check('الراتب يشمل: رؤوس الأعمدة = خلايا الصف بك
       $balOk, $balDetail ? implode(' · ', $balDetail) : "$balN حالة متوازنة");
 // بقية الكشوف والبطاقات التي كانت تتجاهل الزر (جولة p1 الثانية — eoc_quarterly وأخواتها)
 check('الراتب يشمل: المحسومات الفصلية (صندوق التعويضات) — عمود الأجر الإضافي مشروط بالزر',
-      strpos($ofSrc26, "\$allSpan = (\$multiS ? 11 : 10) + (salaryCompHas('extra') ? 1 : 0);") !== false
-      && preg_match('/if \(salaryCompHas\(\'extra\'\)\): \?><th>الأجر<br>الإضافي/u', $ofSrc26) === 1);
+      strpos($ofSrc26, "\$allSpan = (\$multiS ? 12 : 11) + (salaryCompHas('extra') ? 1 : 0);") !== false // +1 عمود «المبلغ الإضافي» كموقع الصندوق (2026-11-16)
+      && preg_match('/if \(salaryCompHas\(\'extra\'\)\): \?><th>الأجر الاضافي/u', $ofSrc26) === 1);
 check('الراتب يشمل: كلفة المؤسسة — الإجمالي والكلفة من البنود الظاهرة فقط وسطور «منها»/النقل مشروطة',
       strpos($ofSrc26, "\$totalCost = \$gross+\$fam+(salaryCompHas('transport') ? \$trans : 0)+\$employerCharges;") !== false
       && strpos($ofSrc26, "if (salaryCompHas('extra')) \$lines[] = ['— منها: الأجر الإضافي'") !== false
