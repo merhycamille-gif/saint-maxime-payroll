@@ -25,6 +25,9 @@ register_shutdown_function(function () use ($PROJ, $REG_HAD_PAUSE) {
 });
 function check(string $name, bool $ok, string $detail = ''): void {
     global $pass, $fail, $results;
+    // ⏱️ (2026-11-16) قياس: الوقت منذ الفحص السابق + وقت وعدد الصفحات المفتوحة ضمنه (يُكتب بـREG_TIMING=1 إلى tmp/_reg_timing.tsv — لا يغيّر أي نتيجة)
+    $now = microtime(true); $GLOBALS['REG_T'][] = [$name, $now - ($GLOBALS['REG_T_LAST'] ?? $now), $GLOBALS['REG_T_RENDER'] ?? 0.0, $GLOBALS['REG_T_RN'] ?? 0];
+    $GLOBALS['REG_T_LAST'] = $now; $GLOBALS['REG_T_RENDER'] = 0.0; $GLOBALS['REG_T_RN'] = 0;
     $ok ? $pass++ : $fail++;
     $results[] = ($ok ? '✅ PASS' : '❌ FAIL') . "  $name" . ($detail !== '' ? "  [$detail]" : '');
 }
@@ -109,15 +112,20 @@ PHP);
          . escapeshellarg($rel) . ' ' . base64_encode(json_encode($get)) . ' ' . base64_encode(json_encode($comp))
          . ' ' . base64_encode(json_encode($schoolIds)) . ' ' . escapeshellarg($currency) . ' ' . escapeshellarg($schoolYear)
          . ' ' . base64_encode(json_encode($files)) . ($dueMode !== '' ? ' ' . escapeshellarg($dueMode) : '') . ($netFamMode !== '' ? ' ' . escapeshellarg($netFamMode) : '') . ($contractGrade !== '' ? ' ' . escapeshellarg($contractGrade) : '');
+    $rT0 = microtime(true);
     if ($outFile !== '') {
         @unlink($outFile);
         shell_exec($cmd . ' 2>NUL > ' . escapeshellarg($outFile));
         $res = (string)@file_get_contents($outFile);
         @unlink($outFile);
+        $GLOBALS['REG_T_RENDER'] = ($GLOBALS['REG_T_RENDER'] ?? 0.0) + (microtime(true) - $rT0); $GLOBALS['REG_T_RN'] = ($GLOBALS['REG_T_RN'] ?? 0) + 1;
         return $res;
     }
-    return (string)shell_exec($cmd . ' 2>NUL');
+    $res = (string)shell_exec($cmd . ' 2>NUL');
+    $GLOBALS['REG_T_RENDER'] = ($GLOBALS['REG_T_RENDER'] ?? 0.0) + (microtime(true) - $rT0); $GLOBALS['REG_T_RN'] = ($GLOBALS['REG_T_RN'] ?? 0) + 1;
+    return $res;
 }
+$GLOBALS['REG_T_LAST'] = microtime(true); $GLOBALS['REG_T0'] = microtime(true);
 $noFatal = fn(string $h) => strpos($h, 'FATAL') !== 0 && stripos($h, 'Fatal error') === false && strlen($h) > 5000;
 
 echo "═══ فحص الانحدار — رواتب Saint-Maxime ═══\n\n";
@@ -11978,6 +11986,28 @@ try {
     $why312 = implode(' ', array_map(fn($k) => $k . '=' . ($c312[$k] ? '✓' : '✗'), array_keys($c312))) . ' · ' . $eng312 . ($bad312 ? ' · نهاية خدمة مخزّنة لفرع مطفأ: ' . implode(',', array_slice($bad312, 0, 8)) : '');
 } catch (Throwable $e) { $ok312 = false; $why312 = $e->getMessage(); }
 check('🌍⚖️ (2026-11-16) الجنسيّة من مصدر واحد (فيليبيني/أثيوبي/بنغلادشي + كتابة باليد، مذكّر للذكر) + فروع الضمان الثلاثة بالملف حسب القانون أو باختياره + غير اللبناني بلا نهاية خدمة 8,5٪ بكل الأشهر والسنين', $ok312, $why312);
+
+/* 🏛️ 313 (2026-11-16) رزنامة المواعيد: فصول صندوق التعويضات بالسنة المدرسية (ت1–ك1 = الفصل 1 من 2026-2027)، المالية والضمان ميلادية؛ مفتاح الفترة المخزّن لا يتغيّر */
+$ok313 = false; $why313 = '';
+try {
+    require_once __DIR__ . '/../includes/legal.php';
+    $lc313 = (string)file_get_contents(__DIR__ . '/../pages/legal_calendar.php');
+    $ok313 = legalPeriodLabel('2026-Q4', 'eoc_quarterly') === 'T1 2026-2027 / الفصل 1' && legalPeriodLabel('2027-Q1', 'official_forms:eoc_quarterly') === 'T2 2026-2027 / الفصل 2'
+        && legalPeriodLabel('2027-Q3', 'eoc_quarterly') === 'T4 2026-2027 / الفصل 4' && legalPeriodLabel('2026-Q4', 'cnss_quarterly') === 'T4 2026 / الفصل 4'
+        && legalPeriodLabel('2026-Q4', 'mof_r10') === 'T4 2026 / الفصل 4' && legalPeriodLabel('2026-Q4') === 'T4 2026 / الفصل 4'
+        && legalPeriodForDue(['period_type' => 'quarter'], 2026, 12) === '2026-Q4'
+        && substr_count($lc313, "legalPeriodLabel(\$f['period'], (string)(\$f['dkey'] ?? ''))") === 2 && strpos($lc313, "legalPeriodLabel(\$o['period'], (string)(\$o['d']['dkey'] ?? ''))") !== false;
+    $why313 = legalPeriodLabel('2026-Q4', 'eoc_quarterly') . ' · ' . legalPeriodLabel('2026-Q4', 'cnss_quarterly');
+} catch (Throwable $e) { $why313 = $e->getMessage(); }
+check('🏛️ (2026-11-16) رزنامة المواعيد: فصل صندوق التعويضات بالسنة المدرسية، والمالية والضمان بالسنة الميلادية', $ok313, $why313);
+
+/* ⏱️ قياس الوقت (اختياري: REG_TIMING=1) */
+if (getenv('REG_TIMING')) {
+    $tl = "sec\trender_sec\trenders\tcheck\n";
+    foreach ($GLOBALS['REG_T'] ?? [] as [$tn, $td, $tr, $tc]) $tl .= sprintf("%.2f\t%.2f\t%d\t%s\n", $td, $tr, $tc, $tn);
+    $tl .= sprintf("%.2f\t\t\tTOTAL\n", microtime(true) - ($GLOBALS['REG_T0'] ?? microtime(true)));
+    @file_put_contents($PROJ . '/tmp/_reg_timing.tsv', $tl);
+}
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

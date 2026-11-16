@@ -111,7 +111,7 @@ function legalTodoItems(): array {
         $due[] = $o;
     }
     if ($due) { // بند واحد مجمَّع: العدد + الأقرب (بدل بند لكل موعد — الجرس يبقى نظيفاً)
-        $n = $due[0]; $per = legalPeriodLabel($n['period']);
+        $n = $due[0]; $per = legalPeriodLabel($n['period'], (string)($n['d']['dkey'] ?? ''));
         $when = $n['days'] < 0 ? 'متأخّر ' . abs($n['days']) . ' يوم' : ($n['days'] === 0 ? 'اليوم!' : 'باقي ' . $n['days'] . ' يوم');
         $short = preg_replace('/ — .*$/u', '', $n['d']['title_ar']); // «الضمان» / «المالية» / «صندوق التعويضات»
         $t[] = ['fas fa-landmark', $late ? 'var(--ic1)' : 'var(--ic3)', count($due), 'Échéances État — ' . count($due) . ($late ? ' (' . $late . ' en retard)' : ''), 'مواعيد للدولة' . ($late ? ' — منها ' . $late . ' متأخّرة' : '') . ' · الأقرب: ' . $short . ' ' . $per . ' — ' . $when . ' (' . date('d/m', strtotime($n['due'])) . ')', $B . 'pages/legal_calendar.php#cal', 'legal', $n['days']];
@@ -123,8 +123,13 @@ function legalTodoItems(): array {
     return $t;
 }
 
-function legalPeriodLabel(string $p): string {
-    if (preg_match('/^(\d{4})-Q([1-4])$/', $p, $m)) return 'T' . $m[2] . ' ' . $m[1] . ' / الفصل ' . $m[2];
+/** تسمية الفترة. 🏛️ (2026-11-16 قراره) صندوق التعويضات يعدّ فصوله على السنة المدرسية كموقعه (ت1–ك1 = الفصل 1 من 2026-2027)؛
+ *  المالية والضمان على السنة الميلادية. $dkey = مفتاح الموعد/التقرير (يحوي eoc لصندوق التعويضات). المفتاح المخزّن للفترة يبقى ميلادياً (YYYY-Qn). */
+function legalPeriodLabel(string $p, string $dkey = ''): string {
+    if (preg_match('/^(\d{4})-Q([1-4])$/', $p, $m)) {
+        if ($dkey !== '' && preg_match('/(^|[:_])eoc_/', $dkey)) { $y = (int)$m[1]; $q = (int)$m[2]; $sq = $q === 4 ? 1 : $q + 1; $sy = $q === 4 ? $y . '-' . ($y + 1) : ($y - 1) . '-' . $y; return 'T' . $sq . ' ' . $sy . ' / الفصل ' . $sq; }
+        return 'T' . $m[2] . ' ' . $m[1] . ' / الفصل ' . $m[2];
+    }
     if (preg_match('/^(\d{4})-(\d{2})$/', $p, $m)) return monthName((int)$m[2]) . ' ' . $m[1];
     return $p;
 }
