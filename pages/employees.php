@@ -402,7 +402,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'mother_first_name_fr' => trim($_POST['mother_first_name_fr'] ?? ''),
         'mother_last_name_fr' => trim($_POST['mother_last_name_fr'] ?? ''),
         'mother_birth_date' => (preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['mother_birth_date'] ?? '') ? $_POST['mother_birth_date'] : null),
-        'nationality' => trim($_POST['nationality'] ?? 'lebanese'),
+        // 🌍 (2026-11-16) المفتاح المعروف، أو «غيرها» + ما كتبه بيده (الفارغ = other)
+        'nationality' => (($_POST['nationality'] ?? 'lebanese') === 'other') ? (trim((string)($_POST['nationality_custom'] ?? '')) !== '' ? natStore($_POST['nationality_custom']) : 'other') : natStore($_POST['nationality'] ?? 'lebanese'),
         'gender' => in_array($_POST['gender'] ?? '', genderValues(), true) ? $_POST['gender'] : null,
         'birth_date' => $_POST['birth_date'] ?: null,
         'birth_place' => trim($_POST['birth_place'] ?? ''),
@@ -485,6 +486,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'cnss_includes_echelon' => isset($_POST['cnss_includes_echelon']) ? 1 : 0,
         'cnss_includes_extra' => isset($_POST['cnss_includes_extra']) ? 1 : 0,
         'cnss_includes_prime_aide' => isset($_POST['cnss_includes_prime_aide']) ? 1 : 0,
+        'cnss_br_maladie' => null, 'cnss_br_family' => null, 'cnss_br_eos' => null, // 🌍⚖️ تُحسم أدناه بعد اكتمال $data (القانون يحتاج الجنسيّة والفئة)
         'eoc_subject' => isset($_POST['eoc_subject']) ? 1 : 0,
         'eoc_includes_echelon' => isset($_POST['eoc_includes_echelon']) ? 1 : 0,
         'eoc_includes_extra' => isset($_POST['eoc_includes_extra']) ? 1 : 0,
@@ -565,6 +567,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         } catch (Exception $e) { unset($data[$flagCol]); }
     }
 
+    // 🌍⚖️ (2026-11-16) فروع الضمان: اختياره يُخزَّن فقط إذا خالف القانون (NULL = تلقائياً حسب القانون فيتبع الجنسيّة والفئة لاحقاً)
+    ensureCnssBranchColumns20261116();
+    $brOldRow = null;
+    if ($action === 'edit' && $id) { try { $brSt = $db->prepare("SELECT * FROM employees WHERE id = ?"); $brSt->execute([(int)$id]); $brOldRow = $brSt->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Throwable $e) {} }
+    $brLawNew = cnssBranchLaw($data);
+    foreach (['maladie', 'family', 'eos'] as $brK) {
+        if (!isset($_POST['cnss_br_present'])) { $data['cnss_br_' . $brK] = $brOldRow['cnss_br_' . $brK] ?? null; continue; } // نموذج بلا خانات الفروع ⇒ يبقى ما كان
+        $brPosted = isset($_POST['cnss_br_' . $brK]) ? 1 : 0;
+        if ($brK !== 'maladie' && $data['employee_type'] !== 'employe') $brPosted = 0; // العائلي ونهاية الخدمة للموظف (قانون العمل) فقط
+        $data['cnss_br_' . $brK] = ($brPosted === (int)$brLawNew[$brK]) ? null : $brPosted;
+    }
+    $brColsOk = true;
+    try { foreach (['cnss_br_maladie', 'cnss_br_family', 'cnss_br_eos'] as $brC) if (!(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees' AND COLUMN_NAME = '$brC'")->fetchColumn()) $brColsOk = false; } catch (Throwable $e) { $brColsOk = false; }
+    if (!$brColsOk) unset($data['cnss_br_maladie'], $data['cnss_br_family'], $data['cnss_br_eos']);
+    $brWas = ($brOldRow && ($brOldRow['employee_type'] ?? '') === 'employe') ? ['family' => cnssBranchOn($brOldRow, 'family'), 'eos' => cnssBranchOn($brOldRow, 'eos')] : null;
     try {
         if ($action === 'new') {
             $cols = array_keys($data);
@@ -600,6 +617,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             applyFamilyAllowanceDates($db, $id, $data); // 👨‍👩‍👧 مدّة التعويض العائلي (بداية افتراضية إن غابت)
             if (isset($_POST['fa_chg_set'])) saveFamilyAllowanceChanges($db, (int)$id, is_array($_POST['fa_chg'] ?? null) ? array_values($_POST['fa_chg']) : []); // 📅💱 التغييرات الشهرية (2026-09-24)
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
+            // 🌍⚖️ (2026-11-16 «منطبّق القانون بكل الأشهر والسنين») فروع الضمان (عائلي/نهاية خدمة — حصّة المدرسة فقط) على كل الأشهر المخزّنة؛ الفرع الذي رجع مضوّى بهذا الحفظ تُبنى حصّته
+            try {
+                $brNowEmp = array_merge($brOldRow ?: [], $data);
+                $brN = cnssBranchesApplyStored($db, (int)$id, $brWas !== null && !$brWas['family'] && cnssBranchOn($brNowEmp, 'family'), $brWas !== null && !$brWas['eos'] && cnssBranchOn($brNowEmp, 'eos'));
+                if ($brN && !empty($_SESSION['flash']['msg'])) $_SESSION['flash']['msg'] .= ' — ⚖️ فروع الضمان طُبّقت على ' . $brN . ' شهراً بكل السنين';
+            } catch (Throwable $t) {}
             // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
             // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
             if (!empty($data['keep_working_past_64'])) {
@@ -719,6 +742,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             applyFamilyAllowanceDates($db, $id, $data); // 👨‍👩‍👧 مدّة التعويض العائلي (بداية افتراضية إن غابت)
             if (isset($_POST['fa_chg_set'])) saveFamilyAllowanceChanges($db, (int)$id, is_array($_POST['fa_chg'] ?? null) ? array_values($_POST['fa_chg']) : []); // 📅💱 التغييرات الشهرية (2026-09-24)
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
+            // 🌍⚖️ (2026-11-16 «منطبّق القانون بكل الأشهر والسنين») فروع الضمان (عائلي/نهاية خدمة — حصّة المدرسة فقط) على كل الأشهر المخزّنة؛ الفرع الذي رجع مضوّى بهذا الحفظ تُبنى حصّته
+            try {
+                $brNowEmp = array_merge($brOldRow ?: [], $data);
+                $brN = cnssBranchesApplyStored($db, (int)$id, $brWas !== null && !$brWas['family'] && cnssBranchOn($brNowEmp, 'family'), $brWas !== null && !$brWas['eos'] && cnssBranchOn($brNowEmp, 'eos'));
+                if ($brN && !empty($_SESSION['flash']['msg'])) $_SESSION['flash']['msg'] .= ' — ⚖️ فروع الضمان طُبّقت على ' . $brN . ' شهراً بكل السنين';
+            } catch (Throwable $t) {}
             // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
             // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
             if (!empty($data['keep_working_past_64'])) {
@@ -1730,12 +1759,16 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                     </div>
                     <div class="form-group">
                         <label class="form-label">Nationalité / الجنسية</label>
-                        <select name="nationality" class="form-select">
-                            <option value="lebanese" <?= $employee['nationality'] === 'lebanese' ? 'selected' : '' ?>>Libanais / لبناني</option>
-                            <option value="syrian" <?= $employee['nationality'] === 'syrian' ? 'selected' : '' ?>>Syrien / سوري</option>
-                            <option value="palestinian" <?= $employee['nationality'] === 'palestinian' ? 'selected' : '' ?>>Palestinien / فلسطيني</option>
-                            <option value="other" <?= $employee['nationality'] === 'other' ? 'selected' : '' ?>>Autre / أخرى</option>
+                        <?php // 🌍 (2026-11-16) لائحة الجنسيّات من مصدر واحد (natOptions) + «غيرها — اكتب الجنسيّة»؛ التسمية بصيغة المذكّر للذكر والمؤنّث للأنثى (تتبدّل مع خانة الجنس)
+                            $natK = natKey($employee['nationality'] ?? ''); $natFem = genderSexOf($employee['gender'] ?? '') === 'f';
+                            $natCustom = $natK === 'custom' ? trim((string)$employee['nationality']) : ''; ?>
+                        <select name="nationality" id="natSel" class="form-select">
+                            <?php foreach (natOptions() as $nk => $no): ?>
+                            <option value="<?= $nk ?>" data-m="<?= e($no['fm'] . ' / ' . $no['m']) ?>" data-f="<?= e($no['ff'] . ' / ' . $no['f']) ?>" data-eos="<?= in_array($nk, ['lebanese', 'palestinian'], true) ? 1 : 0 ?>" <?= $natK === $nk ? 'selected' : '' ?>><?= e($natFem ? $no['ff'] . ' / ' . $no['f'] : $no['fm'] . ' / ' . $no['m']) ?></option>
+                            <?php endforeach; ?>
+                            <option value="other" data-eos="0" <?= in_array($natK, ['other', 'custom'], true) ? 'selected' : '' ?>>Autre (écrire) / غيرها — اكتب الجنسيّة</option>
                         </select>
+                        <input type="text" name="nationality_custom" id="natCustom" class="form-control" style="margin-top:6px;<?= in_array($natK, ['other', 'custom'], true) ? '' : 'display:none' ?>" placeholder="اكتب الجنسيّة / Écrire la nationalité" value="<?= e($natCustom) ?>">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Date de naissance / تاريخ الولادة</label>
@@ -2778,6 +2811,50 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                                 <span><strong>خاضع للضمان</strong> / Inscrit à la CNSS</span>
                                 <label class="switch"><input type="checkbox" name="cnss_subject" value="1" <?= $employee['cnss_subject'] ? 'checked' : '' ?>><span class="slider"></span></label>
                             </label>
+                            <?php // 🌍⚖️ (2026-11-16) فروع الضمان الثلاثة: مضوّى/مطفأ تلقائياً حسب القانون (الجنسيّة والفئة) وله أن يغيّر بيده — اختياره يُحفظ ويغلب (cnss_br_* ؛ NULL = حسب القانون)
+                                $brLaw = cnssBranchLaw($employee); $brIsEmp = ($employee['employee_type'] ?? '') === 'employe';
+                                $brRows = ['maladie' => ['المرض والأمومة', 'Maladie-maternité', '3٪ + 8٪'], 'family' => ['التعويضات العائلية', 'Allocations familiales', '6٪'], 'eos' => ['تعويض نهاية الخدمة', 'Fin de service', '8,5٪']]; ?>
+                            <div id="cnssBranches" style="margin:0 0 12px;padding:8px 10px 26px;border:1px dashed #93c5fd;border-radius:10px;background:#f8fbff">
+                                <input type="hidden" name="cnss_br_present" value="1">
+                                <div style="font-size:12px;color:var(--gray-500)">فروع الضمان — تلقائياً حسب القانون، وبتقدر تغيّر</div>
+                                <div dir="ltr" style="font-size:11px;color:var(--gray-500);margin-bottom:6px;text-align:end">Branches CNSS — selon la loi, modifiables</div>
+                                <div id="cnssBrNote" style="font-size:12px;color:#1d4ed8;margin-bottom:8px"></div>
+                                <?php foreach ($brRows as $bk => [$bAr, $bFr, $bPct]): $bOn = cnssBranchOn($employee, $bk); $bDis = ($bk !== 'maladie' && !$brIsEmp); ?>
+                                <label class="d-flex justify-between align-center cnss-br-row" style="margin-bottom:6px;<?= $bDis ? 'opacity:.45;pointer-events:none' : '' ?>">
+                                    <span><strong><?= $bAr ?></strong> <span style="color:var(--gray-500)"><?= $bPct ?></span> / <?= $bFr ?></span>
+                                    <label class="switch"><input type="checkbox" name="cnss_br_<?= $bk ?>" value="1" data-branch="<?= $bk ?>" <?= ($bOn && !$bDis) ? 'checked' : '' ?>><span class="slider"></span></label>
+                                </label>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php $natSynJs = []; foreach (natOptions() as $nk => $no) foreach (array_merge([$nk, $no['m'], $no['f'], $no['fm'], $no['ff']], $no['syn']) as $nw) $natSynJs[natNorm($nw)] = $nk; ?>
+                            <script>
+                            (function(){
+                                var sel = document.getElementById('natSel'), cus = document.getElementById('natCustom'), gen = document.querySelector('[name="gender"]'),
+                                    typ = document.getElementById('employeeTypeHidden'), box = document.getElementById('cnssBranches');
+                                if (!sel || !cus || !box) return;
+                                var SYN = <?= json_encode($natSynJs, JSON_UNESCAPED_UNICODE) ?>;
+                                function norm(s){ s = String(s || '').toLowerCase().trim().replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[éèê]/g, 'e').replace(/\s+/g, ''); return s.replace(/^ال/, ''); }
+                                function natKey(){ if (sel.value !== 'other') return sel.value; return SYN[norm(cus.value)] || 'other'; }
+                                function law(){ var isEmp = !!typ && typ.value === 'employe', k = natKey(); return { maladie: 1, family: isEmp ? 1 : 0, eos: (isEmp && (k === 'lebanese' || k === 'palestinian')) ? 1 : 0, isEmp: isEmp }; }
+                                function boxes(){ return box.querySelectorAll('input[data-branch]'); }
+                                function note(){
+                                    var L = law(), t = '', man = false;
+                                    if (!L.isEmp) t = 'التعويضات العائلية ونهاية الخدمة للموظف (قانون العمل) فقط.';
+                                    else if (!L.eos) t = 'غير لبناني: نهاية الخدمة مطفأة حسب القانون (المادة 9 من قانون الضمان).';
+                                    boxes().forEach(function(c){ var b = c.getAttribute('data-branch'); if ((b === 'maladie' || L.isEmp) && c.checked !== !!L[b]) man = true; });
+                                    if (man) t += (t ? ' ' : '') + '✋ اختيارك بإيدك غير القانون — بيبقى متل ما حطّيتو.';
+                                    document.getElementById('cnssBrNote').textContent = t;
+                                }
+                                function applyLaw(){ var L = law(); boxes().forEach(function(c){ var b = c.getAttribute('data-branch'), na = (b !== 'maladie' && !L.isEmp), row = c.closest('.cnss-br-row'); if (row) { row.style.opacity = na ? '.45' : ''; row.style.pointerEvents = na ? 'none' : ''; } c.checked = !na && !!L[b]; }); note(); }
+                                function relabel(){ var f = !!gen && (gen.value === 'f' || gen.value === 'd'); Array.prototype.forEach.call(sel.options, function(o){ var l = o.getAttribute(f ? 'data-f' : 'data-m'); if (l) o.textContent = l; }); }
+                                sel.addEventListener('change', function(){ cus.style.display = sel.value === 'other' ? '' : 'none'; applyLaw(); });
+                                cus.addEventListener('input', applyLaw);
+                                if (gen) gen.addEventListener('change', relabel);
+                                if (typ) typ.addEventListener('change', applyLaw);
+                                box.addEventListener('change', function(ev){ if (ev.target && ev.target.getAttribute && ev.target.getAttribute('data-branch')) note(); });
+                                relabel(); note();
+                            })();
+                            </script>
                             <p style="font-size:12px;color:var(--gray-500)">Inclure dans la base:</p>
                             <label><input type="checkbox" name="cnss_includes_echelon" value="1" <?= $employee['cnss_includes_echelon'] ? 'checked' : '' ?>> الدرجة والتدرّج / Échelon</label><br>
                             <label><input type="checkbox" name="cnss_includes_extra" value="1" <?= $employee['cnss_includes_extra'] ? 'checked' : '' ?>> الأجر الإضافي / Supplément</label><br>

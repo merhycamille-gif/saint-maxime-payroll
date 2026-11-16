@@ -436,7 +436,9 @@ class PayrollCalculator {
         $cnssRate = getRateAsOf('cnss_employee_rate', $this->month, $this->year, 3) / 100;
         $eocRate = getRateAsOf('eoc_employee_rate', $this->month, $this->year, 6) / 100;
 
-        $cnssAmount = $maladieBase * $cnssRate;
+        // 🌍⚖️ (2026-11-16) فروع الضمان بالملف (مضوّى/مطفأ — تلقائياً حسب القانون أو باختياره): المصدر الواحد cnssBranchOn
+        $brMaladie = cnssBranchOn($emp, 'maladie'); $brFamily = cnssBranchOn($emp, 'family'); $brEos = cnssBranchOn($emp, 'eos');
+        $cnssAmount = $brMaladie ? $maladieBase * $cnssRate : 0;
         $caisseAmount = $eocBase * $eocRate;
 
         // درجة / نصف راتب → اشتراك صندوق التعويضات لمرّة واحدة عند حدث درجة هذا الشهر:
@@ -504,14 +506,14 @@ class PayrollCalculator {
         $totalDue = floor($netSalary + $familyAllowance + $transportComp);
         
         // === 9. Employer charges (نِسَب مؤرّخة + أسس محدودة بالحدود لكل فرع) ===
-        $schoolCnss = $maladieBase * (getRateAsOf('cnss_employer_rate', $this->month, $this->year, 8) / 100);
+        $schoolCnss = $brMaladie ? $maladieBase * (getRateAsOf('cnss_employer_rate', $this->month, $this->year, 8) / 100) : 0;
         $schoolEoc = ($emp['employee_type'] === 'enseignant_titulaire')
             ? $eocBase * (getRateAsOf('eoc_employer_rate', $this->month, $this->year, 6) / 100)
             : 0;
-        $schoolFamilyComp = ($emp['employee_type'] === 'employe')
+        $schoolFamilyComp = ($emp['employee_type'] === 'employe' && $brFamily)
             ? $famBase * (getRateAsOf('family_compensation_rate', $this->month, $this->year, 6) / 100)
             : 0;
-        $schoolEndOfService = ($emp['employee_type'] === 'employe' && !$past64Employe)
+        $schoolEndOfService = ($emp['employee_type'] === 'employe' && !$past64Employe && $brEos) // غير اللبناني: لا نهاية خدمة (المادة 9)
             ? $finBase * (getRateAsOf('end_of_service_rate', $this->month, $this->year, 8.5) / 100)
             : 0;
         
@@ -1055,7 +1057,7 @@ function backfillEmployerCharges($db, $fromDate = null, $toDate = null) {
     @ignore_user_abort(true);
     $fromKey = $fromDate ? ((int)date('Y', strtotime($fromDate)) * 12 + ((int)date('n', strtotime($fromDate)) - 1)) : 0;
     $toKey   = $toDate   ? ((int)date('Y', strtotime($toDate))   * 12 + ((int)date('n', strtotime($toDate))   - 1)) : PHP_INT_MAX;
-    $rows = $db->query("SELECT ms.id, ms.month, ms.year, ms.cnss_amount_lbp, e.employee_type, e.birth_date
+    $rows = $db->query("SELECT e.*, ms.id, ms.month, ms.year, ms.cnss_amount_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0 AND ms.cnss_amount_lbp > 0")->fetchAll(PDO::FETCH_ASSOC);
     $upd = $db->prepare("UPDATE monthly_salaries SET
@@ -1073,8 +1075,8 @@ function backfillEmployerCharges($db, $fromDate = null, $toDate = null) {
         $subjBase = $cnssRate > 0 ? ((float)$r['cnss_amount_lbp'] / $cnssRate) : 0;
         $isEmploye = ($r['employee_type'] === 'employe');
         $c8  = clampCnssBase($subjBase, 'maladie_maternite', $m, $y) * (getRateAsOf('cnss_employer_rate', $m, $y, 8) / 100);
-        $fam = $isEmploye ? clampCnssBase($subjBase, 'allocations_familiales', $m, $y) * (getRateAsOf('family_compensation_rate', $m, $y, 6) / 100) : 0;
-        $eos = ($isEmploye && !employeExemptEos64($r, $m, $y)) ? clampCnssBase($subjBase, 'fin_de_service', $m, $y) * (getRateAsOf('end_of_service_rate', $m, $y, 8.5) / 100) : 0; // ⚖️ بعد 64 معفى (2026-09-26)
+        $fam = ($isEmploye && cnssBranchOn($r, 'family')) ? clampCnssBase($subjBase, 'allocations_familiales', $m, $y) * (getRateAsOf('family_compensation_rate', $m, $y, 6) / 100) : 0;
+        $eos = ($isEmploye && !employeExemptEos64($r, $m, $y)) && cnssBranchOn($r, 'eos') ? clampCnssBase($subjBase, 'fin_de_service', $m, $y) * (getRateAsOf('end_of_service_rate', $m, $y, 8.5) / 100) : 0; // ⚖️ بعد 64 معفى (2026-09-26)
         $upd->execute([':c8' => floor($c8), ':fam' => floor($fam), ':eos' => floor($eos), ':id' => $r['id']]);
         $n++;
     }

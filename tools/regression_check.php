@@ -11912,6 +11912,58 @@ try {
 } catch (Throwable $e) { $ok311 = false; $why311 = $e->getMessage(); }
 check('🏫 (2026-11-14) صفحات النظام تتبع المدارس المختارة من الأعلى (المدارس، دخول المدارس، فتح السنة، الحسابات، البريد، الفحص الرسمي، التقرير) + صفحة المدارس سريعة', $ok311, $why311);
 
+/* 🌍⚖️ 312 (2026-11-16 «غير لبناني ما نحسم 8,5 · الفروع الثلاثة بملفّو مضوّيين/مطفيّين حسب القانون وأنا إذا بدّي بختار · الجنسيّة بصيغة المذكّر للذكر · بكل الأشهر والسنين») */
+$ok312 = false; $why312 = '';
+try {
+    $fn312 = (string)file_get_contents(__DIR__ . '/../includes/functions.php'); $pc312 = (string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php');
+    $pg312 = (string)file_get_contents(__DIR__ . '/../pages/employees.php'); $hd312 = (string)file_get_contents(__DIR__ . '/../includes/header.php');
+    $c312 = [];
+    // الجنسيّة: مصدر واحد، أيّ كتابة مخزّنة ⇒ مفتاحها، والتسمية حسب الجنس، والمكتوبة باليد تبقى
+    $c312['keys'] = natKey('Syrie') === 'syrian' && natKey('اثيوبية') === 'ethiopian' && natKey('libanaise') === 'lebanese' && natKey('لبنانية/Libanaise') === 'lebanese' && natKey('') === 'lebanese'
+        && natKey('الفليبينية') === 'filipino' && natKey('بنقلادش') === 'bangladeshi' && natKey('other') === 'other' && natKey('هندي') === 'custom' && natStore('هندي') === 'هندي' && natStore('Egyptian') === 'egyptian';
+    $c312['gender'] = natLabel('lebanese', 'm') === 'لبناني' && natLabel('lebanese', 'f') === 'لبنانية' && natLabel('lebanese', 'd') === 'لبنانية' && natLabel('ethiopian', 'm') === 'أثيوبي' && natLabel('filipino', 'f') === 'فيليبينية'
+        && natLabel('bangladeshi', 'm', true) === 'Bangladais' && natDocAr(['nationality' => 'lebanese', 'gender' => 'm']) === 'لبنانية' && natDocAr(['nationality' => 'Syrie', 'gender' => 'f']) === 'سورية' && natDocLat(['nationality' => 'lebanese'], true) === 'libanaise';
+    foreach (['filipino', 'ethiopian', 'bangladeshi'] as $k312) if (!isset(natOptions()[$k312])) $c312['keys'] = false;
+    // القانون: غير اللبناني بلا نهاية خدمة (الفلسطيني تبقى)، العائلي ونهاية الخدمة للموظف فقط، واختياره بالملف يغلب
+    $law312 = fn($t, $n) => cnssBranchLaw(['employee_type' => $t, 'nationality' => $n]);
+    $c312['law'] = $law312('employe', 'lebanese') === ['maladie' => 1, 'family' => 1, 'eos' => 1] && $law312('employe', 'اثيوبية') === ['maladie' => 1, 'family' => 1, 'eos' => 0]
+        && $law312('employe', 'فلسطينية')['eos'] === 1 && $law312('employe', 'other')['eos'] === 0 && $law312('employe', 'هندي')['eos'] === 0 && $law312('enseignant_titulaire', 'lebanese') === ['maladie' => 1, 'family' => 0, 'eos' => 0];
+    $c312['choice'] = cnssBranchOn(['employee_type' => 'employe', 'nationality' => 'other', 'cnss_br_eos' => 1], 'eos') && !cnssBranchOn(['employee_type' => 'employe', 'nationality' => 'lebanese', 'cnss_br_eos' => '0'], 'eos')
+        && cnssBranchOn(['employee_type' => 'employe'], 'eos') && !cnssBranchOn(['employee_type' => 'employe', 'nationality' => 'other', 'cnss_br_eos' => null], 'eos');
+    // الكود: المحرّك وإعادة بناء الحصص يقرآن الفروع من المصدر الواحد · الشفاء موصول بالهيدر · الملف يحمل الخانات واللائحة
+    $c312['code'] = strpos($pc312, "\$brMaladie = cnssBranchOn(\$emp, 'maladie'); \$brFamily = cnssBranchOn(\$emp, 'family'); \$brEos = cnssBranchOn(\$emp, 'eos');") !== false
+        && strpos($pc312, "(\$emp['employee_type'] === 'employe' && !\$past64Employe && \$brEos)") !== false && strpos($pc312, "(\$emp['employee_type'] === 'employe' && \$brFamily)") !== false
+        && strpos($pc312, "\$cnssAmount = \$brMaladie ? \$maladieBase * \$cnssRate : 0;") !== false && strpos($pc312, "&& cnssBranchOn(\$r, 'eos') ? clampCnssBase(") !== false
+        && strpos($hd312, "ensureCnssBranchColumns20261116(); healCnssBranches_20261116();") !== false && strpos($fn312, "function cnssBranchesApplyStored(PDO \$db, int \$empId, bool \$rebuildFam = false, bool \$rebuildEos = false): int {") !== false
+        && strpos($pg312, 'name="cnss_br_present"') !== false && strpos($pg312, 'name="nationality_custom"') !== false && strpos($pg312, "foreach (natOptions() as \$nk => \$no)") !== false
+        && strpos($pg312, "\$data['cnss_br_' . \$brK] = (\$brPosted === (int)\$brLawNew[\$brK]) ? null : \$brPosted;") !== false
+        && substr_count($pg312, "cnssBranchesApplyStored(\$db, (int)\$id,") === 2 && strpos($pg312, "c.disabled =") === false // القفل «تعديل» وحده يملك disabled
+        && strpos((string)file_get_contents(__DIR__ . '/../assets/css/app.css'), "input:checked ~ .slider { background-color: var(--success); }") !== false; // المفتاح المضوّى يبقى أخضر بعد ظهور كبسة الحفظ الفوري
+    // البيانات (كل السنين، مدفوع وغير مدفوع): لا حصّة نهاية خدمة مخزّنة لموظف فرعه مطفأ، والأعمدة موجودة
+    $col312 = (int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees' AND COLUMN_NAME IN ('cnss_br_maladie','cnss_br_family','cnss_br_eos')")->fetchColumn();
+    $bad312 = [];
+    foreach ($db->query("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_end_of_service_8_5_lbp > 0)")->fetchAll(PDO::FETCH_ASSOC) as $e312)
+        if (!cnssBranchOn($e312, 'eos')) $bad312[] = (int)$e312['id'];
+    $c312['data'] = $col312 === 3 && !$bad312;
+    // المحرّك (حساب بلا حفظ): الملف نفسه كلبناني عليه 8,5٪، وكأثيوبي صفر والراتب والصافي وباقي الحصص كما هي؛ والفلسطيني يبقى؛ واختياره يغلب
+    $c312['engine'] = false; $eng312 = '';
+    foreach ($db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.year = 2026 AND ms.month = 10 AND ms.school_end_of_service_8_5_lbp > 0 WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND e.nationality = 'lebanese' AND e.cnss_br_eos IS NULL LIMIT 80")->fetchAll(PDO::FETCH_COLUMN) as $id312) {
+        $run312 = function (array $over) use ($id312) { $c = new PayrollCalculator((int)$id312, 10, 2026); $rp = new ReflectionProperty($c, 'employee'); $rp->setAccessible(true); $rp->setValue($c, array_merge($rp->getValue($c), $over)); return $c->calculate(); };
+        $a312 = $run312([]); if (empty($a312['school_end_of_service_8_5_lbp'])) continue;
+        $b312 = $run312(['nationality' => 'ethiopian']); $p312 = $run312(['nationality' => 'palestinian']); $m312 = $run312(['nationality' => 'ethiopian', 'cnss_br_eos' => 1]); $f312 = $run312(['cnss_br_family' => 0]); $x312 = $run312(['cnss_br_maladie' => 0]);
+        $same312 = fn($u, $v) => (int)$u['net_salary_lbp'] === (int)$v['net_salary_lbp'] && (int)$u['cnss_amount_lbp'] === (int)$v['cnss_amount_lbp'] && (int)$u['school_cnss_8_lbp'] === (int)$v['school_cnss_8_lbp'] && (int)$u['total_due_lbp'] === (int)$v['total_due_lbp'];
+        $c312['engine'] = (int)$b312['school_end_of_service_8_5_lbp'] === 0 && (int)$b312['school_family_comp_6_lbp'] === (int)$a312['school_family_comp_6_lbp'] && $same312($a312, $b312)
+            && (int)$p312['school_end_of_service_8_5_lbp'] === (int)$a312['school_end_of_service_8_5_lbp'] && (int)$m312['school_end_of_service_8_5_lbp'] === (int)$a312['school_end_of_service_8_5_lbp']
+            && (int)$f312['school_family_comp_6_lbp'] === 0 && (int)$f312['school_end_of_service_8_5_lbp'] === (int)$a312['school_end_of_service_8_5_lbp'] && $same312($a312, $f312)
+            && (int)$x312['cnss_amount_lbp'] === 0 && (int)$x312['school_cnss_8_lbp'] === 0 && (int)$x312['net_salary_lbp'] === (int)$a312['net_salary_lbp'] + (int)$a312['cnss_amount_lbp'];
+        $eng312 = '#' . $id312 . ' eos ' . (int)$a312['school_end_of_service_8_5_lbp'] . '→' . (int)$b312['school_end_of_service_8_5_lbp'];
+        break;
+    }
+    $ok312 = !in_array(false, $c312, true);
+    $why312 = implode(' ', array_map(fn($k) => $k . '=' . ($c312[$k] ? '✓' : '✗'), array_keys($c312))) . ' · ' . $eng312 . ($bad312 ? ' · نهاية خدمة مخزّنة لفرع مطفأ: ' . implode(',', array_slice($bad312, 0, 8)) : '');
+} catch (Throwable $e) { $ok312 = false; $why312 = $e->getMessage(); }
+check('🌍⚖️ (2026-11-16) الجنسيّة من مصدر واحد (فيليبيني/أثيوبي/بنغلادشي + كتابة باليد، مذكّر للذكر) + فروع الضمان الثلاثة بالملف حسب القانون أو باختياره + غير اللبناني بلا نهاية خدمة 8,5٪ بكل الأشهر والسنين', $ok312, $why312);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

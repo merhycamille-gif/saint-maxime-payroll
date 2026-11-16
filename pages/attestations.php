@@ -233,7 +233,7 @@ if ($emp && !empty($_GET['dossier'])):
             // 👩 (2026-11-05) اسم الأم بالفرنسي + تاريخ ولادتها إن سُجّلا بالملف
             if (trim(((string)($emp['mother_first_name_fr'] ?? '')) . ' ' . ((string)($emp['mother_last_name_fr'] ?? ''))) !== '') $p .= $row2('Nom de la mère (FR)', trim(($emp['mother_first_name_fr'] ?? '') . ' ' . ($emp['mother_last_name_fr'] ?? '')));
             if (!empty($emp['mother_birth_date']) && $emp['mother_birth_date'] !== '0000-00-00') $p .= $row2('تاريخ ولادة الأم', formatDate($emp['mother_birth_date']));
-            $p .= $row2('الجنسية', $emp['nationality']??'');
+            $p .= $row2('الجنسية', natLabel($emp['nationality'] ?? '', $emp['gender'] ?? ''));
             $p .= $row2('تاريخ الولادة', $emp['birth_date'] ? formatDate($emp['birth_date']) : '');
             $p .= $row2('محل الولادة', $emp['birth_place']??'');
             $p .= $row2('رقم السجل / محله', $registry);
@@ -1496,7 +1496,7 @@ if (!$emp):
         $nextSY  = ($syStart + 1) . '-' . ($syStart + 2);
         $curSY   = $syStart . '-' . ($syStart + 1);
         // معلومات العقد من ملف الأستاذ
-        $natAr = in_array(strtolower((string)($emp['nationality'] ?? '')), ['lebanese','lebanaise','libanaise','لبنانية','لبناني']) ? 'لبنانية' : (string)($emp['nationality'] ?? '');
+        $natAr = natDocAr($emp); // 🌍 (2026-11-16)
         $regNo = trim((string)($emp['civil_registry_number'] ?? '')) . (($emp['civil_registry_place'] ?? '') ? ' / ' . $emp['civil_registry_place'] : '');
         $addr  = implode(' - ', array_values(array_unique(array_filter(array_map(function ($x) { return trim((string)$x); }, [$emp['ville'] ?? '', $emp['quartier'] ?? '', $emp['rue'] ?? '', $emp['immeuble'] ?? '', ($emp['etage'] ?? '') ? ('طابق ' . $emp['etage']) : '', $emp['district'] ?? '', $emp['gouvernorat'] ?? ''])))));
         $dipAr = ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma'], 'ar') : '';
@@ -1836,7 +1836,7 @@ if (!$emp):
                 ? ('$' . nfc($cDailyTrans, 2, true))
                 : (number_format($cDailyTrans) . ' LBP'))
             : '';
-        $natLat = $FR ? (in_array(mb_strtolower((string)($emp['nationality'] ?? '')), ['lebanese','lebanaise','libanaise','لبنانية','لبناني']) ? 'libanaise' : (string)($emp['nationality'] ?? '')) : (in_array(mb_strtolower((string)($emp['nationality'] ?? '')), ['lebanese','lebanaise','libanaise','لبنانية','لبناني']) ? 'Lebanese' : (string)($emp['nationality'] ?? ''));
+        $natLat = natDocLat($emp, (bool)$FR); // 🌍 (2026-11-16)
         ?>
         <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline"><?= $FR ? 'Contrat d\'enseignement' : 'Teaching Contract' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'Entre l\'école' : 'Between' ?> : <strong><?= e($schoolNameFr) ?></strong> &nbsp; <?= $FR ? 'représentée par' : 'represented by' ?> : <?= $directorFr ? '<strong>'.e($directorFr).'</strong>' : $blank(150) ?> &nbsp; ( <strong><?= $FR ? 'Première partie' : 'First party' ?></strong> )</p>

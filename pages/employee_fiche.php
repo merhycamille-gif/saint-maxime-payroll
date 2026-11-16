@@ -356,7 +356,7 @@ if ($L === 'en') {
 $classes = classLevelNames($emp['classes_taught'] ?? '', !$rtl);
 if ($rtl) $classes = implode('، ', array_map(fn($c) => trim((string)preg_replace('/^.*?\s\/\s/u', '', $c)), preg_split('/\s*،\s*/u', (string)$classes, -1, PREG_SPLIT_NO_EMPTY)));
 if ($L === 'en') $classes = str_replace('Secondaire', 'Secondary', (string)$classes);
-$natLbl  = $trTerms($emp['nationality'] ?? '');
+$natLbl  = ($L !== 'en' && isset(natOptions()[natKey($emp['nationality'] ?? '')])) ? natLabel($emp['nationality'] ?? '', $emp['gender'] ?? '', $L === 'fr') : $trTerms($emp['nationality'] ?? ''); // 🌍 (2026-11-16) مذكّر للذكر ومؤنّث للأنثى
 $cycleLbl = $trList($emp['niveau_scolaire'] ?? '');
 // قاموس الموادّ المشترك أوّلاً؛ إن بقي شيء بغير لغة الورقة يكمل قاموس البطاقة (EPS، informatique…)
 $subjFix = function (?string $raw) use ($L, $rtl, $trTerms): string {

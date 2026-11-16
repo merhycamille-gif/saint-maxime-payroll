@@ -538,7 +538,7 @@ if ($form === 'mof_r3') {
     $put($emp['father_name_ar'] ?? '', 84.5, 21.23);
     $put($motherAr, 25.2, 21.6);
     if ($sex !== '') $X($sex === 'f' ? 74.5 : 83.2, 23.68); // مجهول → المربعان فارغان
-    $natR3 = in_array(mb_strtolower(trim((string)($emp['nationality'] ?? ''))), ['lebanese', 'lebanaise', 'libanaise', 'لبنانية', 'لبناني'], true) ? 'لبنانية' : (string)($emp['nationality'] ?? '');
+    $natR3 = natDocAr($emp); // 🌍 (2026-11-16)
     $put($natR3, 40.5, 23.8);
     $put($emp['birth_place'] ?? '', 79.5, 26.6);
     $put($bD, 34.3, 26.25, 'c'); $put($bM, 27.3, 26.25, 'c'); $put($bY, 18.8, 26.25, 'c');
@@ -1593,7 +1593,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     $hTs = $emp['hire_date'] ? strtotime($emp['hire_date']) : 0;
     $hD = $hTs ? (int)date('j', $hTs) : ''; $hM = $hTs ? (int)date('n', $hTs) : ''; $hY = $hTs ? date('Y', $hTs) : '';
     $natRaw = trim((string)($emp['nationality'] ?? ''));
-    $nat = ($natRaw === '' || strcasecmp($natRaw, 'lebanese') === 0 || $natRaw === 'لبناني' || $natRaw === 'لبنانية') ? 'لبنانية' : $natRaw;
+    $nat = $natRaw === '' ? 'لبنانية' : natDocAr($emp); // 🌍 (2026-11-16)
     $married = strpos((string)($emp['social_status'] ?? ''), 'marie') === 0;
     $registry = trim((string)($emp['civil_registry_number'] ?? ''));
     $regPlace = trim((string)($emp['civil_registry_place'] ?? ''));

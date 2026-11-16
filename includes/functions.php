@@ -1730,7 +1730,7 @@ function newTeachersReportCols(): array {
         'source'   => ['المصدر / Source', fn($r) => !empty($r['via_link']) ? ('عبر الرابط / Via le lien' . (!empty($r['submitted_at']) ? ' ' . $d(substr($r['submitted_at'], 0, 10)) : '')) : 'إدخال يدوي / Saisie manuelle', 16],
         'mother'   => ['اسم الأم / Mère', fn($r) => $t(($r['mother_first_name'] ?? '') . ' ' . ($r['mother_last_name'] ?? '')), 14],
         'birth'    => ['الولادة / Naissance', fn($r) => $t($d($r['birth_date'] ?? '') . ' ' . ($r['birth_place'] ?? '')), 16],
-        'nat'      => ['الجنسية / Nationalité', fn($r) => $t($r['nationality'] ?? ''), 10],
+        'nat'      => ['الجنسية / Nationalité', fn($r) => $t(natLabel($r['nationality'] ?? '', $r['gender'] ?? '')), 10],
         'social'   => ['الوضع العائلي / Famille', fn($r) => $t($r['social_status'] ?? '') !== '' ? socialStatusLabel($r['social_status'], 'ar') . ' — الأولاد: ' . (int)($r['number_of_children'] ?? 0) : '', 18],
         'address'  => ['السكن / Adresse', fn($r) => $t(implode(' ', array_filter([$r['gouvernorat'] ?? '', $r['district'] ?? '', $r['ville'] ?? '', $r['quartier'] ?? '', $r['rue'] ?? '', $r['immeuble'] ?? '', $r['etage'] ?? '']))), 24],
         'phone'    => ['الهاتف / Tél.', fn($r) => implode(' / ', array_filter([$t($r['phone1'] ?? ''), $t($r['phone2'] ?? '')])), 16],
@@ -2233,6 +2233,151 @@ function healDerivedExchangeRates(bool $force = false): int {
         if ($n) logAudit('heal_derived_exchange_rate', 'monthly_salaries', 0, null, ['rows' => $n]);
     } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
     return $n;
+}
+/**
+ * 🌍⚖️ (2026-11-16 «محل ما منختار الجنسية زيد الفليبينية والأثيوبية والبنغلادش وكمان اقدر أنا اكتب الجنسية · بس نحط غير لبناني ما نحسم 8,5 ·
+ *  بملفّو بمحلّ الضمان: نهاية الخدمة والمرض والأمومة والتعويضات العائلية مضوّيين أو مطفيّين حسب القانون وأنا إذا بدّي بختار ·
+ *  إذا كان ذكر نحطّ الجنسيّة بصيغة المذكّر · منطبّق القانون بكل الأشهر والسنين»).
+ *  القانون (المادة 9 من قانون الضمان، الأجراء الأجانب): «لا يخضع أرباب العمل للموجبات المتعلّقة بفرع نهاية الخدمة إلّا إذا كان يحقّ
+ *  للأجراء الاستفادة من تقديمات هذا النوع» ⇒ غير اللبناني: نهاية الخدمة مطفأة، والمرض والأمومة والتعويضات العائلية تبقى؛
+ *  اللاجئ الفلسطيني معفى من شرط المعاملة بالمثل ⇒ نهاية الخدمة تبقى عنده. المصدر الواحد للجنسيّة وللفروع = هذه الدوال.
+ */
+function natOptions(): array {
+    return [
+        'lebanese'    => ['m' => 'لبناني',    'f' => 'لبنانية',    'fm' => 'Libanais',     'ff' => 'Libanaise',      'syn' => ['lebanese', 'libanais', 'libanaise', 'lebanaise', 'liban', 'lebanon', 'لبنان']],
+        'syrian'      => ['m' => 'سوري',      'f' => 'سورية',      'fm' => 'Syrien',       'ff' => 'Syrienne',       'syn' => ['syrian', 'syrien', 'syrienne', 'syrie', 'syria', 'سوريا']],
+        'palestinian' => ['m' => 'فلسطيني',   'f' => 'فلسطينية',   'fm' => 'Palestinien',  'ff' => 'Palestinienne',  'syn' => ['palestinian', 'palestinien', 'palestinienne', 'palestine', 'فلسطين']],
+        'egyptian'    => ['m' => 'مصري',      'f' => 'مصرية',      'fm' => 'Égyptien',     'ff' => 'Égyptienne',     'syn' => ['egyptian', 'egyptien', 'egyptienne', 'egypte', 'egypt', 'مصر']],
+        'filipino'    => ['m' => 'فيليبيني',  'f' => 'فيليبينية',  'fm' => 'Philippin',    'ff' => 'Philippine',     'syn' => ['filipino', 'filipina', 'philippines', 'فلبيني', 'فلبينية', 'فليبيني', 'فليبينية', 'الفيليبين', 'الفلبين']],
+        'ethiopian'   => ['m' => 'أثيوبي',    'f' => 'أثيوبية',    'fm' => 'Éthiopien',    'ff' => 'Éthiopienne',    'syn' => ['ethiopian', 'ethiopien', 'ethiopienne', 'ethiopie', 'ethiopia', 'اثيوبيا', 'حبشي', 'حبشية']],
+        'bangladeshi' => ['m' => 'بنغلادشي',  'f' => 'بنغلادشية',  'fm' => 'Bangladais',   'ff' => 'Bangladaise',    'syn' => ['bangladeshi', 'bangladesh', 'بنغلادش', 'بنغلاديش', 'بنغلاديشي', 'بنغلاديشية', 'بنقلادش', 'بنقلادشي', 'بنقلادشية', 'بنغالي', 'بنغالية']],
+    ];
+}
+/** تسوية نصّ الجنسيّة للمطابقة: أحرف صغيرة، بلا تشكيل ولا نبرات، أ/إ/آ = ا، ة = ه، ى = ي، بلا «ال» التعريف وبلا فراغات. */
+function natNorm($s): string {
+    $s = mb_strtolower(trim((string)$s), 'UTF-8');
+    $s = preg_replace('/[\x{064B}-\x{0652}\x{0640}]/u', '', $s);
+    $s = str_replace(['أ', 'إ', 'آ', 'ة', 'ى', 'é', 'è', 'ê'], ['ا', 'ا', 'ا', 'ه', 'ي', 'e', 'e', 'e'], $s);
+    $s = preg_replace('/\s+/u', '', $s);
+    return (string)preg_replace('/^ال/u', '', $s);
+}
+/** مفتاح الجنسيّة من أيّ كتابة مخزّنة («Syrie»، «اثيوبية»، «libanaise»…): مفتاح من natOptions، أو 'other' (أخرى بلا تحديد)، أو 'custom' (جنسيّة مكتوبة باليد). الفارغ = لبناني. */
+function natKey($raw): string {
+    static $map = null;
+    if ($map === null) {
+        $map = [];
+        foreach (natOptions() as $k => $o) foreach (array_merge([$k, $o['m'], $o['f'], $o['fm'], $o['ff']], $o['syn']) as $w) $map[natNorm($w)] = $k;
+    }
+    $raw = trim((string)$raw);
+    if ($raw === '') return 'lebanese';
+    foreach (array_merge([$raw], preg_split('~\s*[/|،,]\s*~u', $raw) ?: []) as $part) { $n = natNorm($part); if ($n !== '' && isset($map[$n])) return $map[$n]; }
+    if (in_array(natNorm($raw), ['other', 'autre', 'اخري', 'غير', 'غيرها'], true)) return 'other';
+    return 'custom';
+}
+/** ما يُخزَّن بعمود الجنسيّة: المفتاح المعروف، وإلا النصّ كما كتبه. */
+function natStore($raw): string { $k = natKey($raw); return $k === 'custom' ? trim((string)$raw) : $k; }
+/** تسمية الجنسيّة حسب الجنس («إذا كان ذكر نحطّ الجنسيّة بصيغة المذكّر»): ذكر = لبناني، أنثى/آنسة = لبنانية، غير محدَّد = $unknown ('m' أو 'f'). المكتوبة باليد تبقى كما هي. */
+function natLabel($raw, $gender = '', bool $fr = false, string $unknown = 'm'): string {
+    $k = natKey($raw); $o = natOptions()[$k] ?? null;
+    if (!$o) return $k === 'other' ? ($fr ? 'Autre' : 'أخرى') : trim((string)$raw);
+    $sx = function_exists('genderSexOf') ? genderSexOf($gender) : ''; if ($sx === '') $sx = $unknown;
+    return $fr ? $o[$sx === 'f' ? 'ff' : 'fm'] : $o[$sx === 'f' ? 'f' : 'm'];
+}
+/** الجنسيّة بالمستندات والنماذج (عربي): اللبناني «لبنانية» كما كانت بكل النماذج (صفة «الجنسيّة»)، والجنسيّة المعروفة بتسميتها العربية حسب الجنس بدل المفتاح الخام (syrian/filipino…)، والمكتوبة باليد كما هي. */
+function natDocAr(array $emp): string {
+    $raw = trim((string)($emp['nationality'] ?? '')); if ($raw === '') return '';
+    $k = natKey($raw);
+    if ($k === 'lebanese') return 'لبنانية';
+    return isset(natOptions()[$k]) ? natLabel($raw, $emp['gender'] ?? '', false, 'f') : $raw;
+}
+/** الجنسيّة بالمستندات اللاتينية: فرنسي بصيغة «nationalité» المؤنّثة (libanaise، syrienne…)، إنكليزي Lebanese/Syrian…؛ المكتوبة باليد كما هي. */
+function natDocLat(array $emp, bool $fr): string {
+    $raw = trim((string)($emp['nationality'] ?? '')); if ($raw === '') return '';
+    $k = natKey($raw); $o = natOptions()[$k] ?? null;
+    if (!$o) return $raw;
+    return $fr ? mb_strtolower($o['ff'], 'UTF-8') : ucfirst($k);
+}
+/** ⚖️ فروع الضمان حسب القانون لهذا الملف: المرض والأمومة للكل · التعويضات العائلية للموظف (قانون العمل) · نهاية الخدمة للموظف اللبناني أو الفلسطيني (المادة 9). */
+function cnssBranchLaw(array $emp): array {
+    $isEmp = ($emp['employee_type'] ?? '') === 'employe';
+    $k = natKey($emp['nationality'] ?? '');
+    return ['maladie' => 1, 'family' => $isEmp ? 1 : 0, 'eos' => ($isEmp && in_array($k, ['lebanese', 'palestinian'], true)) ? 1 : 0];
+}
+/** الفرع مضوّى؟ اختياره بالملف (cnss_br_* = 0/1) يغلب؛ الفارغ (NULL) = تلقائياً حسب القانون. بلوغ الـ64 يبقى شرطاً مستقلاً فوقه (employeExemptEos64). */
+function cnssBranchOn(array $emp, string $br): bool {
+    $c = 'cnss_br_' . $br;
+    if (array_key_exists($c, $emp) && $emp[$c] !== null && $emp[$c] !== '') return (int)$emp[$c] === 1;
+    return (bool)(cnssBranchLaw($emp)[$br] ?? 1);
+}
+/** تركيب ذاتي: أعمدة اختيار الفروع بملف الموظف (NULL = حسب القانون). */
+function ensureCnssBranchColumns20261116(): void {
+    static $done = false; if ($done) return; $done = true;
+    try {
+        $db = getDB();
+        foreach (['cnss_br_maladie', 'cnss_br_family', 'cnss_br_eos'] as $c) {
+            if (!(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees' AND COLUMN_NAME = '$c'")->fetchColumn()) {
+                $db->exec("ALTER TABLE employees ADD COLUMN `$c` TINYINT(1) NULL DEFAULT NULL");
+            }
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+/**
+ * ⚖️ تطبيق فروع الملف على الأشهر المخزّنة «بكل الأشهر والسنين» (قراره 2026-11-16 «هيدا برنامج وقانون») — حصّتا المدرسة فقط
+ * (تعويضات عائلية 6٪ ونهاية خدمة 8,5٪): لا تدخلان بالراتب ولا بالصافي، فالتعديل جراحي على العمودين وحدهما والمدفوع يبقى مدفوعاً.
+ * فرع مطفأ ⇒ صفر بكل الأشهر. فرع رجع مضوّى بهذا الحفظ ($rebuild*) وحصّته صفر بشهر عليه ضمان ⇒ تُبنى من الأجر الخاضع المخزّن (كـbackfillEmployerCharges)، وبعد الـ64 تبقى صفراً.
+ * نسخة للصفوف المتأثّرة بـ _ms_bk_cnssbr1116 قبل أيّ تعديل. يرجّع عدد الصفوف المعدَّلة.
+ */
+function cnssBranchesApplyStored(PDO $db, int $empId, bool $rebuildFam = false, bool $rebuildEos = false): int {
+    $n = 0;
+    try {
+        $st = $db->prepare("SELECT * FROM employees WHERE id = ?"); $st->execute([$empId]);
+        $emp = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$emp || ($emp['employee_type'] ?? '') !== 'employe') return 0;
+        $famOn = cnssBranchOn($emp, 'family'); $eosOn = cnssBranchOn($emp, 'eos');
+        $rs = $db->prepare("SELECT id, month, year, cnss_amount_lbp, school_family_comp_6_lbp f6, school_end_of_service_8_5_lbp e85 FROM monthly_salaries WHERE employee_id = ?");
+        $rs->execute([$empId]);
+        $todo = [];
+        foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $m = (int)$r['month']; $y = (int)$r['year']; $f6 = (int)round((float)$r['f6']); $e85 = (int)round((float)$r['e85']);
+            $cr = getRateAsOf('cnss_employee_rate', $m, $y, 3) / 100;
+            $subj = ($cr > 0 && (float)$r['cnss_amount_lbp'] > 0) ? ((float)$r['cnss_amount_lbp'] / $cr) : 0;
+            $nf = $f6; $ne = $e85;
+            if (!$famOn) $nf = 0;
+            elseif ($rebuildFam && $f6 === 0 && $subj > 0) $nf = (int)floor(clampCnssBase($subj, 'allocations_familiales', $m, $y) * (getRateAsOf('family_compensation_rate', $m, $y, 6) / 100));
+            if (!$eosOn) $ne = 0;
+            elseif ($rebuildEos && $e85 === 0 && $subj > 0 && !employeExemptEos64($emp, $m, $y)) $ne = (int)floor(clampCnssBase($subj, 'fin_de_service', $m, $y) * (getRateAsOf('end_of_service_rate', $m, $y, 8.5) / 100));
+            if ($nf !== $f6 || $ne !== $e85) $todo[] = [(int)$r['id'], $nf, $ne];
+        }
+        if (!$todo) return 0;
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_cnssbr1116 LIKE monthly_salaries");
+        $db->exec("INSERT IGNORE INTO _ms_bk_cnssbr1116 SELECT * FROM monthly_salaries WHERE id IN (" . implode(',', array_column($todo, 0)) . ")");
+        $up = $db->prepare("UPDATE monthly_salaries SET school_family_comp_6_lbp = ?, school_end_of_service_8_5_lbp = ? WHERE id = ?");
+        foreach ($todo as [$id, $nf, $ne]) { $up->execute([$nf, $ne, $id]); $n++; }
+        if (function_exists('logAudit')) { try { logAudit('update', 'monthly_salaries', $empId, 'فروع الضمان', 'تطبيق فروع الملف على ' . $n . ' شهراً (عائلي ' . ($famOn ? 'مضوّى' : 'مطفأ') . ' · نهاية خدمة ' . ($eosOn ? 'مضوّاة' : 'مطفأة') . ')'); } catch (Throwable $e) {} }
+    } catch (Throwable $e) { /* لا تكسر الحفظ */ }
+    return $n;
+}
+/** 🩹 مرّة واحدة: كل موظف (قانون العمل) غير لبناني فرعه مطفأ بالقانون وله حصّة مخزّنة ⇒ تُصفَّر بكل السنين (فلاغ heal_cnss_branches_20261116). */
+function healCnssBranches_20261116(): void {
+    static $done = false; if ($done) return; $done = true;
+    try {
+        if (strpos((string)getSetting('heal_cnss_branches_20261116', ''), 'done') === 0) return;
+        ensureCnssBranchColumns20261116();
+        $db = getDB();
+        $ids = $db->query("SELECT DISTINCT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+            WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND ms.school_end_of_service_8_5_lbp > 0
+              AND LOWER(TRIM(COALESCE(e.nationality, ''))) NOT IN ('', 'lebanese')")->fetchAll(PDO::FETCH_COLUMN);
+        $rows = 0; $who = [];
+        foreach ($ids as $id) {
+            $st = $db->prepare("SELECT * FROM employees WHERE id = ?"); $st->execute([(int)$id]); $emp = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$emp || cnssBranchOn($emp, 'eos')) continue;
+            $k = cnssBranchesApplyStored($db, (int)$id);
+            if ($k) { $rows += $k; $who[] = (int)$id; }
+        }
+        setSetting('heal_cnss_branches_20261116', 'done: rows=' . $rows . ' emps=' . implode(',', $who) . ' @' . date('Y-m-d H:i'));
+    } catch (Throwable $ex) {
+        try { setSetting('heal_cnss_branches_20261116', 'err: ' . mb_substr($ex->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
 }
 /**
  * ⚖️🩹 (2026-09-26 «الموظف الخاضع لقانون العمل وصار عمره 64 وبعده يشتغل ما بيخضع لتعويض نهاية الخدمة»):

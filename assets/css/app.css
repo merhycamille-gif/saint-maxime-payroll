@@ -894,8 +894,9 @@ body.rtl .table th { text-align: right; }
     border-radius: 50%;
 }
 
-input:checked + .slider { background-color: var(--success); }
-input:checked + .slider:before { transform: translateX(20px); }
+/* 🧷 (2026-11-16) «~» لا «+»: كبسة الحفظ الفوري تنحشر بين الخانة والمفتاح بعد أيّ تغيير، فكان المفتاح المضوّى يبيّن مطفأً */
+input:checked ~ .slider { background-color: var(--success); }
+input:checked ~ .slider:before { transform: translateX(20px); }
 
 /* =================== Salary Slip =================== */
 .salary-slip {

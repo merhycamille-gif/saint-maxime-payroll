@@ -488,7 +488,7 @@ if (in_array($form, $imageForms)) {
     $bgKey = ($form === 'tax_r6t') ? 'tax_r6' : $form;
 
     // قيم مشتركة
-    $natAr = ($emp && $emp['nationality'] === 'lebanese') ? 'لبنانية' : ($emp['nationality'] ?? '');
+    $natAr = $emp ? natDocAr($emp) : ''; // 🌍 (2026-11-16) التسمية العربية بدل المفتاح الخام
     $sal = $emp ? ofLatestSalary($db, $emp['id']) : null;
     $salary = $sal ? composedSalaryLbp($sal) : 0; // الراتب المركّب (يتبع «الراتب يشمل»)
     $data = [];
@@ -1109,7 +1109,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     <div class="fline"><span class="lbl">اسم الأجير</span> <?= fval($emp['first_name_ar'] ?: $emp['first_name_fr']) ?> <span class="lbl">الشهرة</span> <?= fval($emp['last_name_ar'] ?: $emp['last_name_fr']) ?> <span class="lbl">رقمه في الصندوق</span> <?= fval(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', ''),'g') ?></div>
     <div class="fline"><span class="lbl">اسم الأب</span> <?= fval($emp['father_name_ar']) ?> <span class="lbl">اسم الأم وشهرتها</span> <?= fval(trim($emp['mother_first_name'].' '.$emp['mother_last_name'])) ?></div>
     <div class="fline"><span class="lbl">تاريخ ومحل الولادة</span> <?= fval(formatDate($emp['birth_date']).' - '.$emp['birth_place']) ?> <span class="lbl">رقم السجل</span> <?= fval($emp['civil_registry_number'],'g') ?></div>
-    <div class="fline"><span class="lbl">الجنسية</span> <?= fval($emp['nationality']==='lebanese'?'لبنانية':$emp['nationality'],'g') ?></div>
+    <div class="fline"><span class="lbl">الجنسية</span> <?= fval(natDocAr($emp),'g') ?></div>
     <div class="fline"><span class="lbl">الوضع العائلي :</span> <?= fopt('أعزب',1,!$isMarried) ?> <?= fopt('متأهل',2,$isMarried) ?> <?= fopt('أرمل',3) ?> <?= fopt('مطلق',4) ?> <?= fopt('هاجر',5) ?></div>
 
     <?php if (!$isTerm): ?>
@@ -1272,7 +1272,7 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">اسم الأب:</span> <?= fillVal($emp['father_name_ar']) ?></div>
         <div><span class="k">اسم الأم وشهرتها:</span> <?= fillVal(trim($emp['mother_first_name'].' '.$emp['mother_last_name'])) ?></div>
         <div><span class="k">محل وتاريخ الولادة:</span> <?= fillVal($emp['birth_place'].' - '.formatDate($emp['birth_date'])) ?></div>
-        <div><span class="k">الجنسية:</span> <?= fillVal($emp['nationality']==='lebanese'?'لبنانية':$emp['nationality']) ?></div>
+        <div><span class="k">الجنسية:</span> <?= fillVal(natDocAr($emp)) ?></div>
         <div><span class="k">رقم السجل:</span> <?= fillVal($emp['civil_registry_number'].' / '.$emp['civil_registry_place']) ?></div>
         <div><span class="k">الوضع العائلي:</span> <?= fillVal(socialStatusLabel($emp['social_status'],'ar')) ?></div>
         <div><span class="k">عدد الأولاد:</span> <?= fillVal($emp['number_of_children']) ?></div>
@@ -2053,7 +2053,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
             <div><span class="k">٣. إسم الأب:</span> <?= fillVal($emp['father_name_ar']) ?></div>
             <div><span class="k">٤. إسم الأم وشهرتها:</span> <?= fillVal(trim($emp['mother_first_name'].' '.$emp['mother_last_name'])) ?></div>
             <div><span class="k">٥. الجنس:</span> <?= cbox('ذكر') ?><?= cbox('أنثى') ?></div>
-            <div><span class="k">٦. الجنسية:</span> <?= fillVal($emp['nationality']==='lebanese'?'لبنانية':$emp['nationality']) ?></div>
+            <div><span class="k">٦. الجنسية:</span> <?= fillVal(natDocAr($emp)) ?></div>
             <div><span class="k">٧. محل الولادة:</span> <?= fillVal($emp['birth_place']) ?></div>
             <div><span class="k">٨. تاريخ الولادة:</span> <?= fillVal(formatDate($emp['birth_date'])) ?></div>
             <div><span class="k">٩. رقم السجل:</span> <?= fillVal($emp['civil_registry_number']) ?></div>
