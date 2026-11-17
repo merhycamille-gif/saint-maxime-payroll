@@ -135,6 +135,30 @@ if (($_GET['export'] ?? '') === 'json' && $data) {
     while (ob_get_level()) ob_end_clean(); header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
     echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit;
 }
+/* ===== 🖨️ ورقة الطباعة طبق ورقة موقع الصندوق (2026-11-17) — صفحة مستقلّة، لا تمسّ الشاشة ولا باقي التصديرات ===== */
+if (($_GET['export'] ?? '') === 'sheet' && $data && $validPeriod) {
+    require_once __DIR__ . '/../includes/eoc_sheet.php';
+    $shC = ['school_name' => preg_replace('/^\s*مدرسة\s+/u', '', (string)$school['name_ar']), 'school_type' => $data['school_type'] ?? 'non_free', 'caisse_no' => (string)($school['caisse_number'] ?? ''), 'phone' => (string)($data['phone'] ?? '')];
+    // اسم المدرسة كما هو مسجَّل عند الصندوق (إعداد eoc_site_name_<رقم المدرسة>، مأخوذ من ورقة الموقع) — وإلا اسمها بالبرنامج
+    if (count($ids) === 1 && ($shNm = trim((string)getSetting('eoc_site_name_' . (int)$ids[0], ''))) !== '') $shC['school_name'] = $shNm;
+    if ($kind === 'general') {
+        $shEmp = $emp === 'contract' ? 'contract' : 'staff';
+        $shRows = array_values(array_filter(eocGeneralRows($db, $ids, $period, $data), fn($r) => $r['employment_type'] === $shEmp));   // كل أساتذة الفئة (بلا بحث الشاشة)
+        foreach ($shRows as &$shR) { $shR['certificate'] = eocCertOptions()[(int)$shR['certificate_id']] ?? ''; $shR['category'] = eocCatOptions()[(int)$shR['category_id']] ?? ''; $shR['phase'] = eocPhaseOptions()[(int)$shR['phase_id']] ?? ''; } unset($shR);
+        $shHtml = eocSheetHtml('general', $shC + ['sy' => $period, 'emp' => $shEmp, 'rows' => $shRows]);
+    } else {
+        $shSy = $pi['special'] === '' ? ($pi['q'] === 1 ? ($pi['y'] - 1) . '-' . $pi['y'] : ($pi['y'] - 1) . '-' . $pi['y']) : ($pi['y'] - 1) . '-' . $pi['y'];
+        $shG = eocGeneralRows($db, $ids, $shSy, eocLoad($db, $ids, 'general', $shSy)); $shFa = []; $shSt = 0; $shCo = 0;
+        foreach ($shG as $g) { if ($g['employment_type'] === 'staff') $shSt++; else $shCo++; if (!empty($g['emp_id'])) $shFa[(int)$g['emp_id']] = (string)$g['father_name']; }
+        $shRows = eocFinancialRows($db, $ids, $period, $data);   // كل سطور البيان (بلا بحث الشاشة)
+        foreach ($shRows as &$shR) { $shR['father_name'] = $shFa[(int)($shR['emp_id'] ?? 0)] ?? ''; } unset($shR);
+        // ترتيب ورقة الموقع: الاسم الأوّل ثمّ اسم الأب ثمّ الشهرة (الموقع يرتّب باسم الأستاذ الثلاثي المسجَّل عنده)
+        $shKey = function ($r) { $w = preg_split('/\s+/u', trim((string)$r['teacher_name']), 2); return eocNorm(($w[0] ?? '') . ' ' . (string)$r['father_name'] . ' ' . ($w[1] ?? '')); };
+        usort($shRows, fn($x, $y) => strcmp($shKey($x), $shKey($y)));
+        $shHtml = eocSheetHtml('financial', $shC + ['sy' => $shSy, 'code' => $period, 'quarter' => $pi['label'], 'staff' => $shSt, 'contract' => $shCo, 'rows' => $shRows, 'tot' => eocFinancialTotals($shRows)]);
+    }
+    while (ob_get_level()) ob_end_clean(); header('Content-Type: text/html; charset=utf-8'); header('Cache-Control: no-store'); echo $shHtml; exit;
+}
 /* ===== إكسل ===== */
 if (($_GET['export'] ?? '') === 'xlsx' && $data) {
     $bytes = eocBuildXlsx($kind, $period, $rows, $school, ['phone' => $data['phone'] ?? '', 'school_type' => $data['school_type'] ?? '']);
@@ -170,7 +194,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
 .sp-body{padding-top:22px;padding-bottom:40px}
 .sp-page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px} .sp-back{display:inline-flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12.5px;color:var(--sp-muted);text-decoration:none}
 .sp-title-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap} .sp-title{font-size:21px;font-weight:700;color:var(--sp-navy);margin:0;line-height:1.3} .sp-title-sub{font-weight:600;color:var(--sp-text)} .sp-title-note{font-size:13px;font-weight:500;color:var(--sp-muted)}
-.sp-page-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sp-page-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .sp-print-pair{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--sp-navy)}
 .sp-panel{background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:var(--sp-radius);margin-bottom:var(--sp-gap)}
 .sp-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--sp-border-soft)} .sp-panel-title{font-size:15px;font-weight:700;color:var(--sp-navy);margin:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap} .sp-panel-meta{font-size:12.5px;font-weight:500;color:var(--sp-muted)} .sp-panel-body{padding:16px 20px}
 .sp-panel-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--sp-border-soft);background:var(--sp-subtle);border-radius:0 0 var(--sp-radius) var(--sp-radius)}
@@ -325,7 +349,8 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
         <div class="sp-title-note"><?= e($school['name_ar']) ?> — رقم المدرسة <?= e((string)($school['caisse_number'] ?: '—')) ?></div></div>
       <div class="sp-page-actions no-print">
         <?php if ($E): ?><form method="post" style="display:inline"><?= csrfField() ?><input type="hidden" name="eoc_act" value="status"><button type="submit" class="sp-btn sp-btn-view"><i class="fas <?= $locked ? 'fa-lock-open' : 'fa-lock' ?>"></i> <?= $locked ? 'فتح للتعديل' : 'اعتماد وإقفال' ?></button></form><?php endif; ?>
-        <button type="button" class="sp-btn sp-btn-view" onclick="ppPrint(this)" <?= $missCount ? 'disabled title="بيانات ناقصة"' : '' ?>><i class="fas fa-print"></i> <?= $missCount ? 'الطباعة غير متاحة' : 'طباعة البيان' ?></button>
+        <?php if ($missCount): ?><button type="button" class="sp-btn sp-btn-view" disabled title="بيانات ناقصة"><i class="fas fa-lock"></i> الطباعة غير متاحة</button>
+        <?php else: ?><span class="sp-print-pair" title="ورقة الطباعة طبق ورقة موقع الصندوق"><i class="fas fa-print"></i> طباعة <a class="sp-btn sp-btn-view" target="_blank" rel="noopener" href="<?= e($self . '?' . http_build_query(['tab' => 'general', 'period' => $period, 'export' => 'sheet', 'emp' => 'staff'])) ?>">الملاك</a><a class="sp-btn sp-btn-view" target="_blank" rel="noopener" href="<?= e($self . '?' . http_build_query(['tab' => 'general', 'period' => $period, 'export' => 'sheet', 'emp' => 'contract'])) ?>">المتعاقدين</a></span><?php endif; ?>
       </div></div>
     <?php if ($missCount): ?><div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i><span>لا يمكن طباعة البيان العام على المنصّة: بيانات <?= $missCount ?> أستاذ ناقصة (جميع حقول البيان العام إلزامية). الخانات الناقصة معلّمة بـ «ناقص» في الجدول — اضغط على ✎ لإكمالها هنا، أو أكملها بملف الأستاذ بالبرنامج فتُحسب تلقائياً.</span></div><?php endif; ?>
 
@@ -451,7 +476,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
         <div class="sp-title-note"><?= e($pi['label']) ?> — <?= e($pi['range']) ?> — <?= e($school['name_ar']) ?></div></div>
       <div class="sp-page-actions no-print">
         <?php if ($E): ?><form method="post" style="display:inline"><?= csrfField() ?><input type="hidden" name="eoc_act" value="status"><button type="submit" class="sp-btn sp-btn-view"><i class="fas <?= $locked ? 'fa-lock-open' : 'fa-lock' ?>"></i> <?= $locked ? 'فتح للتعديل' : 'اعتماد وإقفال' ?></button></form><?php endif; ?>
-        <button type="button" class="sp-btn sp-btn-view" onclick="ppPrint(this)"><i class="fas fa-print"></i> طباعة البيان</button>
+        <a class="sp-btn sp-btn-view" target="_blank" rel="noopener" title="ورقة الطباعة طبق ورقة موقع الصندوق" href="<?= e($self . '?' . http_build_query(['tab' => 'financial', 'period' => $period, 'export' => 'sheet'])) ?>"><i class="fas fa-print"></i> طباعة البيان</a>
       </div></div>
     <?php if ($locked): ?><div class="alert alert-success"><i class="fas fa-check-circle"></i><span>هذا البيان معتمد ومقفل.</span></div><?php endif; ?>
     <?php if ($pi['special']): ?><div class="alert alert-info"><i class="fas fa-info-circle"></i><span>بيان خاص بشهر <?= e(monthName($pi['first'][1], 'ar')) ?> <?= $pi['first'][0] ?>: يُعبَّأ تلقائياً بأساتذة الملاك الذين لهم درجة أو نصف راتب بهذا الشهر (المبالغ بعمودَي «درجة» و«نصف راتب»)، والمحسومات لشهر واحد. عدّل أو احذف أو أضف كما يلزم.</span></div><?php endif; ?>
