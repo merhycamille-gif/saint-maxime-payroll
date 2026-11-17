@@ -142,10 +142,13 @@ if (($_GET['export'] ?? '') === 'sheet' && $data && $validPeriod) {
     // اسم المدرسة كما هو مسجَّل عند الصندوق (إعداد eoc_site_name_<رقم المدرسة>، مأخوذ من ورقة الموقع) — وإلا اسمها بالبرنامج
     if (count($ids) === 1 && ($shNm = trim((string)getSetting('eoc_site_name_' . (int)$ids[0], ''))) !== '') $shC['school_name'] = $shNm;
     if ($kind === 'general') {
-        $shEmp = $emp === 'contract' ? 'contract' : 'staff';
-        $shRows = array_values(array_filter(eocGeneralRows($db, $ids, $period, $data), fn($r) => $r['employment_type'] === $shEmp));   // كل أساتذة الفئة (بلا بحث الشاشة)
-        foreach ($shRows as &$shR) { $shR['certificate'] = eocCertOptions()[(int)$shR['certificate_id']] ?? ''; $shR['category'] = eocCatOptions()[(int)$shR['category_id']] ?? ''; $shR['phase'] = eocPhaseOptions()[(int)$shR['phase_id']] ?? ''; } unset($shR);
-        $shHtml = eocSheetHtml('general', $shC + ['sy' => $period, 'emp' => $shEmp, 'rows' => $shRows]);
+        $shEmp = in_array($emp, ['contract', 'both'], true) ? $emp : 'staff';
+        $shAll = eocGeneralRows($db, $ids, $period, $data);   // كل الأساتذة (بلا بحث الشاشة)
+        foreach ($shAll as &$shR) { $shR['certificate'] = eocCertOptions()[(int)$shR['certificate_id']] ?? ''; $shR['category'] = eocCatOptions()[(int)$shR['category_id']] ?? ''; $shR['phase'] = eocPhaseOptions()[(int)$shR['phase_id']] ?? ''; } unset($shR);
+        $shOf = fn($t) => array_values(array_filter($shAll, fn($r) => $r['employment_type'] === $t));
+        $shHtml = $shEmp === 'both' ? eocSheetGeneralBoth($shC + ['sy' => $period, 'rows' => $shOf('staff')], $shC + ['sy' => $period, 'rows' => $shOf('contract')])
+                                    : eocSheetHtml('general', $shC + ['sy' => $period, 'emp' => $shEmp, 'rows' => $shOf($shEmp)]);
+        $shDocs = fn() => $shEmp === 'both' ? [eocSheetHtml('general', $shC + ['sy' => $period, 'emp' => 'staff', 'rows' => $shOf('staff')]), eocSheetHtml('general', $shC + ['sy' => $period, 'emp' => 'contract', 'rows' => $shOf('contract')])] : [$shHtml];
     } else {
         $shSy = $pi['special'] === '' ? ($pi['q'] === 1 ? ($pi['y'] - 1) . '-' . $pi['y'] : ($pi['y'] - 1) . '-' . $pi['y']) : ($pi['y'] - 1) . '-' . $pi['y'];
         $shG = eocGeneralRows($db, $ids, $shSy, eocLoad($db, $ids, 'general', $shSy)); $shFa = []; $shSt = 0; $shCo = 0;
@@ -157,11 +160,33 @@ if (($_GET['export'] ?? '') === 'sheet' && $data && $validPeriod) {
         usort($shRows, fn($x, $y) => strcmp($shKey($x), $shKey($y)));
         $shHtml = eocSheetHtml('financial', $shC + ['sy' => $shSy, 'code' => $period, 'quarter' => $pi['label'], 'staff' => $shSt, 'contract' => $shCo, 'rows' => $shRows, 'tot' => eocFinancialTotals($shRows)]);
     }
+    $shBase = ($kind === 'general' ? 'Bilan general ' : 'Bilan financier ') . $period . ' ' . preg_replace('/[^A-Za-z0-9 _-]/', '', (string)($school['name_fr'] ?? 'school')) . ' (caisse)';
+    if (($_GET['fmt'] ?? '') === 'doc') {   // 📝 وورد طبق ورقة الصندوق
+        $shDoc = eocSheetWordDoc(isset($shDocs) ? $shDocs() : [$shHtml], ($kind === 'general' ? 'البيان العام ' : 'البيان المالي ') . $period);
+        while (ob_get_level()) ob_end_clean(); header('Content-Type: application/msword; charset=utf-8'); header('Content-Disposition: attachment; filename="' . $shBase . '.doc"'); header('Content-Length: ' . strlen($shDoc)); header('Cache-Control: no-store'); echo $shDoc; exit;
+    }
+    if (($_GET['fmt'] ?? '') === 'pdf') {
+        try {
+            require_once __DIR__ . '/../includes/pdf_chromium.php';
+            $shPdf = MsaChromePdf::rawPdf($shHtml, ['marginTop' => '7mm', 'marginBottom' => '7mm', 'marginLeft' => '7mm', 'marginRight' => '7mm', 'waitDelay' => '2s']);
+            $shFn = $shBase . '.pdf';
+            while (ob_get_level()) ob_end_clean(); header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="' . $shFn . '"'); header('Content-Length: ' . strlen($shPdf)); header('Cache-Control: no-store'); echo $shPdf; exit;
+        } catch (Throwable $shE) { $shHtml = eocSheetAutoPrint($shHtml); }   // لا خدمة PDF ⇒ الورقة + حوار الطباعة («حفظ بصيغة PDF»)
+    }
     while (ob_get_level()) ob_end_clean(); header('Content-Type: text/html; charset=utf-8'); header('Cache-Control: no-store'); echo $shHtml; exit;
 }
 /* ===== إكسل ===== */
 if (($_GET['export'] ?? '') === 'xlsx' && $data) {
-    $bytes = eocBuildXlsx($kind, $period, $rows, $school, ['phone' => $data['phone'] ?? '', 'school_type' => $data['school_type'] ?? '']);
+    $xlEx = ['phone' => $data['phone'] ?? '', 'school_type' => $data['school_type'] ?? '', 'site_name' => count($ids) === 1 ? trim((string)getSetting('eoc_site_name_' . (int)$ids[0], '')) : ''];
+    if ($kind === 'financial' && $pi) {   // 📗 2026-11-17: كورقة الصندوق — اسم الأب + عدد البيان العام + ترتيب الاسم الأوّل/الأب/الشهرة
+        $xlSy = ($pi['y'] - 1) . '-' . $pi['y']; $xlFa = []; $xlSt = 0; $xlCo = 0;
+        foreach (eocGeneralRows($db, $ids, $xlSy, eocLoad($db, $ids, 'general', $xlSy)) as $g) { if ($g['employment_type'] === 'staff') $xlSt++; else $xlCo++; if (!empty($g['emp_id'])) $xlFa[(int)$g['emp_id']] = (string)$g['father_name']; }
+        foreach ($rows as &$xlR) { $xlR['father_name'] = $xlFa[(int)($xlR['emp_id'] ?? 0)] ?? ''; } unset($xlR);
+        $xlKey = function ($r) { $w = preg_split('/\s+/u', trim((string)$r['teacher_name']), 2); return eocNorm(($w[0] ?? '') . ' ' . (string)$r['father_name'] . ' ' . ($w[1] ?? '')); };
+        usort($rows, fn($x, $y) => strcmp($xlKey($x), $xlKey($y)));
+        $xlEx += ['sy' => $xlSy, 'staff' => $xlSt, 'contract' => $xlCo];
+    }
+    $bytes = eocBuildXlsx($kind, $period, $rows, $school, $xlEx);
     while (ob_get_level()) ob_end_clean();
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="' . ($kind === 'general' ? 'Bilan general ' : 'Bilan financier ') . $period . ' ' . preg_replace('/[^A-Za-z0-9 _-]/', '', (string)($school['name_fr'] ?? 'school')) . ' (caisse).xlsx"');
@@ -249,9 +274,10 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
     <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <?php if ($data): ?>
         <a class="btn btn-success" href="<?= e($back(['export' => 'xlsx', 'emp' => $emp !== 'all' ? $emp : null, 'sort' => $sort !== 'name' ? $sort : null, 'search' => $search ?: null])) ?>"><i class="fas fa-file-excel"></i> إكسل (صيغ حيّة)</a>
-        <button type="button" class="btn btn-primary" onclick="ppPrint(this)"><i class="fas fa-print"></i> طباعة</button>
-        <button type="button" class="btn btn-danger" onclick="msaSavePdfStart(this)"><i class="fas fa-file-pdf"></i> حفظ PDF</button>
-        <?php if (!isViewer()): ?><button type="button" class="btn btn-info" onclick="ppWord('<?= $exT ?>')"><i class="fas fa-file-word"></i> وورد</button><?php endif; ?>
+        <?php $shTop = $self . '?' . http_build_query(['tab' => $tab, 'period' => $period, 'export' => 'sheet'] + ($kind === 'general' ? ['emp' => 'both'] : [])); /* 🖨️ 2026-11-17 «نعم»: الطباعة والـPDF من فوق = ورقة الصندوق نفسها */ ?>
+        <a class="btn btn-primary" target="_blank" rel="noopener" href="<?= e($shTop) ?>" title="ورقة الطباعة طبق ورقة موقع الصندوق"><i class="fas fa-print"></i> طباعة</a>
+        <a class="btn btn-danger" target="_blank" rel="noopener" href="<?= e($shTop . '&fmt=pdf') ?>" title="ورقة الصندوق PDF"><i class="fas fa-file-pdf"></i> حفظ PDF</a>
+        <?php if (!isViewer()): ?><a class="btn btn-info" href="<?= e($shTop . '&fmt=doc') ?>" title="ورقة الصندوق وورد"><i class="fas fa-file-word"></i> وورد</a><?php endif; ?>
         <button type="button" class="btn" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $exT ?>','')"><i class="fab fa-whatsapp"></i> واتساب</button>
         <?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail('<?= $exT ?>','')"><i class="fas fa-envelope"></i> بريد إلكتروني</button><?php endif; ?>
         <span class="eoc-sep" role="group" aria-label="عرض الأرقام" style="display:inline-flex;border:1px solid #cbd5e1;border-radius:12px;overflow:hidden">
@@ -599,4 +625,23 @@ function eocSep(on){ try{ localStorage.setItem('eoc_sep', on?'1':'0'); }catch(e)
     if(location.hash){ var t=document.querySelector(location.hash); if(t) setTimeout(function(){ t.scrollIntoView({block:'start'}); },50); }
 })();
 </script>
+<?php if ($data && $validPeriod): /* 📨 2026-11-17 «صحّح الكل متل الصندوق»: واتساب/بريد يرسلان PDF ورقة الصندوق */ ?>
+<script>
+(function () {
+    var U = <?= json_encode($self . '?' . http_build_query(['tab' => $tab, 'period' => $period, 'export' => 'sheet'] + ($kind === 'general' ? ['emp' => 'both'] : [])) . '&fmt=pdf', JSON_UNESCAPED_SLASHES) ?>;
+    function sheetPdf() {
+        return fetch(U, { credentials: 'same-origin' }).then(function (r) {
+            if (!r.ok || !/application\/pdf/i.test(r.headers.get('Content-Type') || '')) throw new Error('sheet pdf unavailable');
+            var m = /filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '');
+            return r.blob().then(function (b) { if (b.size < 500) throw new Error('empty'); return { blob: b, name: m ? m[1] : 'Bilan (caisse).pdf' }; });
+        });
+    }
+    function hook() {
+        if (!window.msaPdfBlob || window.msaPdfBlob.__eocSheet) return;
+        var old = window.msaPdfBlob; window.msaPdfBlob = function () { return sheetPdf().catch(function () { return old(); }); }; window.msaPdfBlob.__eocSheet = true;
+    }
+    hook(); document.addEventListener('DOMContentLoaded', hook); window.addEventListener('load', hook);
+})();
+</script>
+<?php endif; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

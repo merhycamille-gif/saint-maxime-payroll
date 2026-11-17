@@ -441,42 +441,63 @@ function eocResetLine(array &$data, string $key): void { unset($data['lines'][$k
 
 /* ===== إكسل (نفس أعمدة المنصّة) ===== */
 function eocBuildXlsx(string $kind, string $period, array $rows, array $school, array $extra = []): string {
-    require_once __DIR__ . '/mehe_budget.php';
-    $X = new MeheXlsx(); $c = [MeheXlsx::class, 'c']; $n = [MeheXlsx::class, 'n']; $fx = [MeheXlsx::class, 'fx']; $L = [MeheXlsx::class, 'col'];
+    /* 📗 (2026-11-17 «صحّح الكل متل الصندوق») الإكسل بترتيب ورقة طباعة موقع الصندوق: A4 بالطول، نفس الترويسة والأعمدة وتسمياتها والمجاميع والملاحظة والتواقيع
+       (المالي 12 عموداً مع «اسم الاب» و«ملاحظات»؛ العام ورقتان «الملاك» و«المتعاقدين» بـ13 عموداً مع «التوقيع») — والمجاميع صيغ حيّة.
+       $extra: phone, school_type + (اختياري) site_name اسم المدرسة عند الصندوق · fathers [emp_id ⇒ اسم الأب] · staff/contract عدد البيان العام · sy السنة. */
+    require_once __DIR__ . '/mehe_budget.php'; require_once __DIR__ . '/eoc_sheet.php';
+    $X = new MeheXlsx(); $c = [MeheXlsx::class, 'c']; $n = [MeheXlsx::class, 'n']; $fx = [MeheXlsx::class, 'fx'];
     $num = fn($v) => (float)str_replace([',', ' '], '', (string)$v);
-    $name = (string)($school['name_ar'] ?? '');
+    $name = trim((string)($extra['site_name'] ?? '')) ?: preg_replace('/^\s*مدرسة\s+/u', '', (string)($school['name_ar'] ?? ''));
+    $type = ['free' => 'مجاني', 'non_free' => 'غيرمجاني', 'professional' => 'مهني'][$extra['school_type'] ?? 'non_free'] ?? 'غيرمجاني';
+    $blank = fn(int $k, int $s = 12) => array_fill(0, $k, $c('', $s));
+    // ترويسة الورقة (سطور مدموجة على عرض الجدول): العنوان يميناً والوصف يساراً، ثمّ المدرسة ورقمها وهاتفها والسنة
+    $head = function (int $si, string $last, int $split, string $desc, string $sy) use ($X, $c, $blank, $name, $type, $school, $extra) {
+        $LS = MeheXlsx::col($split); $LN = MeheXlsx::col($split + 1); $nc = ord($last) - 64;
+        $X->row($si, array_merge([$c('صندوق التعويضات لافراد الهيئة التعليمية في المدارس الخاصة', 1)], $blank($split - 1, 1), [$c($desc, 12)], $blank($nc - $split - 1)), 34); $X->merge($si, "A1:{$LS}1"); $X->merge($si, "{$LN}1:{$last}1");
+        foreach (['في مدرسة ' . $name . ' / ' . $type, 'رقم المدرسة ' . ($school['caisse_number'] ?? ''), 'هاتف المدرسة ' . ($extra['phone'] ?? ''), 'من السنة المدرسية ' . $sy] as $t) { $r = $X->rowCount($si) + 1; $X->row($si, [$c($t, 9)], 20); $X->merge($si, "A$r:$last$r"); }
+    };
     if ($kind === 'general') {
-        // 🖊️ (2026-11-09 «ناقص عامود لإمضاء الأستاذ») كورقة الطباعة الرسمية بالمنصّة: عمود «التوقيع» + تذييل خاتم المدرسة وتوقيع المدير
-        $si = $X->sheet('البيان العام ' . $period, [5, 11, 13, 28, 14, 26, 12, 12, 13, 15, 9, 14, 14, 18]);
-        $X->row($si, [$c('البيان العام ' . $period . ' — ' . $name . ' — رقم المدرسة ' . ($school['caisse_number'] ?? ''), 1)], 26); $X->merge($si, 'A1:N1');
-        $X->row($si, [$c('رقم هاتف المدرسة: ' . ($extra['phone'] ?? '') . ' — نوع المدرسة: ' . (eocSchoolTypes()[$extra['school_type'] ?? 'non_free'] ?? ''), 12)]); $X->merge($si, 'A2:N2');
-        $X->row($si, array_map(fn($l) => $c($l, 2), ['#', 'ملاك/متعاقد', 'الرقم المالي', 'الاسم والشهرة', 'اسم الاب', 'الشهادة', 'الفئة', 'المرحلة', 'تاريخ الولادة', 'تاريخ دخول الخدمة', 'ساعات', 'الراتب', 'الأجر الاضافي', 'التوقيع']), 30);
-        $r0 = $X->rowCount($si) + 1; $i = 0;
-        foreach ($rows as $r) { $i++; $X->row($si, [$n($i, 13), $c($r['employment_type'] === 'staff' ? 'ملاك' : 'متعاقد'), $c($r['teacher_no']), $c($r['teacher_name']), $c($r['father_name']), $c(eocCertOptions()[(int)$r['certificate_id']] ?? ''), $c(eocCatOptions()[(int)$r['category_id']] ?? ''), $c(eocPhaseOptions()[(int)$r['phase_id']] ?? ''), $c($r['birth_date']), $c($r['start_date']), $n($num($r['teaching_hours'])), $n($num($r['salary'])), $n($num($r['add_salary'])), $c('')], 24); }
-        $r1 = $X->rowCount($si);
-        if ($i) $X->row($si, [$c('المجموع (كل الأساتذة)', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $fx("SUM(K$r0:K$r1)", 7), $fx("SUM(L$r0:L$r1)", 7), $fx("SUM(M$r0:M$r1)", 7), $c('', 6)]);
-        $X->row($si, []);
-        $rn = $X->rowCount($si) + 1; $X->row($si, [$c('ملحوظة: ينظم هذا البيان عن جميع أفراد الهيئة التعليمية في المدرسة', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('نظم وصدق على مسؤوليتي بتاريخ', 12)]); $X->merge($si, "A$rn:G$rn"); $X->merge($si, "H$rn:N$rn");
-        $rn++; $X->row($si, [$c('خاتم المدرسة', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('توقيع المدير أو من يقوم مقامه', 12)], 60); $X->merge($si, "A$rn:G$rn"); $X->merge($si, "H$rn:N$rn");
-        $rn++; $X->row($si, [$c('عدد الاساتذة: ' . $i, 9)]); $X->merge($si, "A$rn:G$rn");
+        $made = 0;
+        foreach (['staff' => ['الملاك', 'ملاك', 'الداخلين في الملاك'], 'contract' => ['المتعاقدين', 'متعاقد', 'الداخلين في التعاقد']] as $emp => [$tabName, $lbl, $descTail]) {
+            $rs = array_values(array_filter($rows, fn($r) => ($r['employment_type'] ?? '') === $emp)); if (!$rs) continue;
+            $made++; $si = $X->sheet($tabName . ' ' . $period, [4, 8, 19, 9, 10, 15, 9, 8, 10, 5, 11, 14, 10], false);
+            $head($si, 'M', 7, 'البيان العام السنوي لأفراد الهيئة التعليمية ' . $descTail, $period);
+            $r = $X->rowCount($si) + 1; $X->row($si, [$c('فئة: ' . $lbl . ' — عدد الأساتذة: ' . count($rs), 9)], 20); $X->merge($si, "A$r:M$r");
+            $X->row($si, array_map(fn($l) => $c($l, 2), ['#', 'الرقم المالي', 'الاسم والشهرة', 'اسم الاب', 'تاريخ الولادة', 'الشهادة', 'الفئة', 'المرحلة', 'تاريخ دخول الخدمة', 'ساعات', 'الراتب', 'الأجر الاضافي', 'التوقيع']), 30);
+            $r0 = $X->rowCount($si) + 1; $i = 0;
+            foreach ($rs as $r_) { $i++; $X->row($si, [$n($i, 13), $c($r_['teacher_no'], 13), $c($r_['teacher_name']), $c($r_['father_name']), $c($r_['birth_date'], 13), $c(eocCertOptions()[(int)$r_['certificate_id']] ?? '', 13), $c(eocCatOptions()[(int)$r_['category_id']] ?? '', 13), $c(eocPhaseOptions()[(int)$r_['phase_id']] ?? '', 13), $c($r_['start_date'], 13),
+                (string)$r_['teaching_hours'] === '' ? $c('', 13) : $n($num($r_['teaching_hours'])), (string)$r_['salary'] === '' ? $c('', 13) : $n($num($r_['salary'])), (string)$r_['add_salary'] === '' ? $c('', 13) : $n($num($r_['add_salary'])), $c('', 13)], 24); }
+            $r1 = $X->rowCount($si);
+            $rt = $r1 + 1; $X->row($si, array_merge([$c('المجموع — عدد الاساتذة ' . $i, 6)], $blank(8, 6), $i ? [$fx("SUM(J$r0:J$r1)", 7), $fx("SUM(K$r0:K$r1)", 7), $fx("SUM(L$r0:L$r1)", 7)] : [$c('', 6), $c('', 6), $c('', 6)], [$c('', 6)])); $X->merge($si, "A$rt:I$rt");
+            $X->row($si, []);
+            $rn = $X->rowCount($si) + 1; $X->row($si, array_merge([$c('ملحوظة: ينظم هذا البيان عن جميع أفراد الهيئة التعليمية في المدرسة', 12)], $blank(6), [$c('نظم وصدق على مسؤوليتي بتاريخ', 12)], $blank(5)), 22); $X->merge($si, "A$rn:G$rn"); $X->merge($si, "H$rn:M$rn");
+            $rn++; $X->row($si, array_merge([$c('خاتم المدرسة', 12)], $blank(6), [$c('توقيع المدير أو من يقوم مقامه', 12)], $blank(5)), 60); $X->merge($si, "A$rn:G$rn"); $X->merge($si, "H$rn:M$rn");
+            $rn++; $X->row($si, [$c('عدد الاساتذة: ' . $i, 9)]); $X->merge($si, "A$rn:G$rn");
+        }
+        if (!$made) { $si = $X->sheet('البيان العام ' . $period, [4, 8, 19, 9, 10, 15, 9, 8, 10, 5, 11, 14, 10], false); $head($si, 'M', 7, 'البيان العام السنوي لأفراد الهيئة التعليمية', $period); }
         return $X->bytes();
     }
-    $pi = eocPeriodInfo($period);
-    $si = $X->sheet('البيان المالي ' . $period, [5, 13, 30, 14, 14, 14, 15, 15, 12, 13, 14]);
-    $X->row($si, [$c('البيان المالي ' . $period . ($pi ? ' — ' . $pi['label'] : '') . ' — ' . $name . ' — رقم المدرسة ' . ($school['caisse_number'] ?? ''), 1)], 26); $X->merge($si, 'A1:K1');
-    $X->row($si, array_map(fn($l) => $c($l, 2), ['#', 'الرقم المالي', 'الاسم والشهرة', 'الراتب السابق', 'الراتب الحالي', 'الأجر الاضافي', 'محسومات شهرية', 'محسومات فصلية', 'نصف راتب', 'درجة / مختلف', 'المبلغ الإضافي']), 30);
+    $pi = eocPeriodInfo($period); $sy = (string)($extra['sy'] ?? ($pi ? ($pi['y'] - 1) . '-' . $pi['y'] : '')); $fa = (array)($extra['fathers'] ?? []);
+    $si = $X->sheet('البيان المالي ' . $period, [4, 8, 18, 9, 15, 12, 16, 15, 15, 13, 12, 6], false);
+    $head($si, 'L', 6, 'بيان بالمحسومات المقتطعة ومساهمة المدرسة عن افراد الهيئة التعليمية الداخلين في الملاك', $sy);
+    $r = $X->rowCount($si) + 1; $X->row($si, [$c('عن الفصل: ' . ($pi ? $pi['label'] : $period), 9)], 20); $X->merge($si, "A$r:L$r");
+    if (isset($extra['staff'])) { $r++; $X->row($si, [$c('البيان العام لهذه السنة — ملاك: ' . (int)$extra['staff'] . ' — متعاقدين: ' . (int)($extra['contract'] ?? 0), 9)], 20); $X->merge($si, "A$r:L$r"); }
+    $X->row($si, array_map(fn($l) => $c($l, 2), ['#', 'الرقم المالي', 'الاسم والشهرة', 'اسم الاب', 'الراتب الشهري السابق', 'الراتب الشهري الحالي', 'الأجر الاضافي', 'المحسومات الشهرية ل.ل', 'المحسومات الفصلية ل.ل', 'نصف راتب ل.ل', 'مختلف، درجة تمرين ل.ل', 'ملاحظات']), 32);
     $r0 = $X->rowCount($si) + 1; $i = 0;
-    foreach ($rows as $r) { $i++; $rr = $X->rowCount($si) + 1; $X->row($si, [$n($i, 13), $c($r['teacher_no']), $c($r['teacher_name']), $n($num($r['previous_salary'])), $n($num($r['current_salary'])), $n($num($r['add_salary'])), $n($num($r['teacher_m_disc'])), $n($num($r['teacher_q_disc'])), $n($num($r['discount_half_salary'])), $n($num($r['training_degree'])), $fx("I$rr+J$rr")]); }
+    foreach ($rows as $r_) { $i++; $X->row($si, [$n($i, 13), $c($r_['teacher_no'], 13), $c($r_['teacher_name']), $c((string)($r_['father_name'] ?? ($fa[(int)($r_['emp_id'] ?? 0)] ?? ''))), $n($num($r_['previous_salary'])), $n($num($r_['current_salary'])), $n($num($r_['add_salary'])), $n($num($r_['teacher_m_disc'])), $n($num($r_['teacher_q_disc'])), $n($num($r_['discount_half_salary'])), $n($num($r_['training_degree'])), $c((string)($r_['remarks'] ?? ''))]); }
     $r1 = $X->rowCount($si);
     if ($i) {
-        $X->row($si, [$c('المجموع (كل الأساتذة)', 6), $c('', 6), $c('', 6), $fx("SUM(D$r0:D$r1)", 7), $fx("SUM(E$r0:E$r1)", 7), $fx("SUM(F$r0:F$r1)", 7), $fx("SUM(G$r0:G$r1)", 7), $fx("SUM(H$r0:H$r1)", 7), $fx("SUM(I$r0:I$r1)", 7), $fx("SUM(J$r0:J$r1)", 7), $fx("SUM(K$r0:K$r1)", 7)]);
-        $rt = $X->rowCount($si); $X->row($si, []);
-        $X->row($si, [$c('المحسومات المقتطعة (فصلية + المبلغ الإضافي)', 6), $c('', 6), $c('', 6), $fx("H$rt+K$rt", 7)]);
+        $rt = $r1 + 1; $X->row($si, array_merge([$c('المجموع — عدد الاساتذة ' . $i, 6)], $blank(3, 6), array_map(fn($L) => $fx("SUM($L$r0:$L$r1)", 7), ['E', 'F', 'G', 'H', 'I', 'J', 'K']), [$c('', 6)])); $X->merge($si, "A$rt:D$rt");
+        $X->row($si, []);
         $t = eocFinancialTotals($rows);
-        $X->row($si, [$c('مساهمة المدرسة', 6), $c('', 6), $c('', 6), $n($t['school_total'], 7)]);
-        $rA = $X->rowCount($si) - 1; $rB = $X->rowCount($si);
-        $X->row($si, [$c('المجموع العام', 6), $c('', 6), $c('', 6), $fx("D$rA+D$rB", 7)]);
-        $X->row($si, [$c('المادة 6 من المرسوم الاشتراعي 47 تاريخ 29/06/1983.', 12)]);
+        $sumRow = function (string $lbl, array $cell) use ($X, $si, $c, $blank) { $r = $X->rowCount($si) + 1; $X->row($si, array_merge([$c($lbl, 6)], $blank(3, 6), [$cell])); $X->merge($si, "A$r:D$r"); return $r; };
+        $rQ = $sumRow('المحسومات الفصلية', $fx("I$rt", 7)); $rA = $sumRow('المبلغ الإضافي (نصف راتب + درجة)', $fx("J$rt+K$rt", 7)); $rW = $sumRow('المحسومات المقتطعة', $fx("E$rQ+E$rA", 7));
+        $rS = $sumRow('مساهمة المدرسة', $n($t['school_total'], 7)); $sumRow('المجموع العام', $fx("E$rW+E$rS", 7));
+        $r = $X->rowCount($si) + 1; $X->row($si, [$c('فقط ' . eocWordsAr($t['grand']) . ' ليرة لبنانية', 9)], 22); $X->merge($si, "A$r:L$r");
+        $X->row($si, []);
+        foreach (['ملاحظة: نص المادة 6 من المرسوم الاشتراعي رقم 47 تاريخ 29/06/1983', 'تتكون المحسومات من:', '1- نصف راتب الشهر الأول من خدمة الموظف.', '2- ستة بالمئة من الراتب الشهري.', '3- القسط الأول من كل زيادة تطرأ على الراتب.'] as $tline) { $r = $X->rowCount($si) + 1; $X->row($si, [$c($tline, 12)]); $X->merge($si, "A$r:L$r"); }
+        $X->row($si, []);
+        $r = $X->rowCount($si) + 1; $X->row($si, array_merge([$c('ختم المدرسة', 12)], $blank(3), [$c('توقيع المدير أو من يقوم مقامه', 12)], $blank(3), [$c('نظم وصدق على مسؤوليتي بتاريخ ____ / ____ / ______', 12)], $blank(3)), 60); $X->merge($si, "A$r:D$r"); $X->merge($si, "E$r:H$r"); $X->merge($si, "I$r:L$r");
     }
     return $X->bytes();
 }

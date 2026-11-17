@@ -426,3 +426,64 @@ function eocSheetHtml(string $kind, array $c): string {
     foreach (eocSheetJs($kind) as $js) $o .= '<script type="text/javascript">' . $js . '</script>';
     return $o . '</body></html>';
 }
+
+/**
+ * 🖨️ البيان العام بورقة واحدة للطباعة/الحفظ: ورقة الملاك ثمّ ورقة المتعاقدين (كل واحدة كما يطبعها الموقع لوحدها، بترقيمها الخاصّ، والثانية تبدأ بصفحة جديدة).
+ * سكربت تقسيم الصفحات هو سكربت الموقع نفسه، مُشغَّلاً مرّة لكل قسم (document.body ⇒ القسم). أيّ تغيّر بنصّ السكربت يُكشف هنا (استثناء) بدل ورقة مخرَّبة.
+ */
+function eocSheetGeneralBoth(array $cStaff, array $cContract): string {
+    $docs = [eocSheetHtml('general', ['emp' => 'staff'] + $cStaff), eocSheetHtml('general', ['emp' => 'contract'] + $cContract)];
+    $secs = [];
+    foreach ($docs as $d) {
+        if (!preg_match('#<body>(.*)</body>#su', $d, $m)) throw new RuntimeException('eoc sheet: body');
+        $b = preg_replace('#<script\b.*?</script>#su', '', $m[1]); $b = preg_replace('#<div class="toolbar">.*?</div>#su', '', $b, 1);
+        $secs[] = '<div class="ba-sec">' . $b . '</div>';
+    }
+    [$fit, $pg] = eocSheetJs('general'); $n = 0;
+    $pg2 = str_replace('var body  = document.body;', 'var body  = ROOT;', $pg, $c1); $pg2 = str_replace("document.querySelector('", "ROOT.querySelector('", $pg2, $c2);
+    $pg2 = str_replace("body.innerHTML = (toolbar ? toolbar.outerHTML : '') + out;", 'body.innerHTML = out;', $pg2, $c3);
+    $pg2 = preg_replace('/^\s*\(function \(\) \{/u', 'function eocPaginate(ROOT) {', $pg2, 1, $c4); $pg2 = preg_replace('/\}\)\(\);\s*$/u', '}', $pg2, 1, $c5);
+    if ($c1 !== 1 || $c2 < 4 || $c3 !== 1 || $c4 !== 1 || $c5 !== 1 || strpos($pg2, 'document.') !== false && preg_match('/document\.(?!createElement)/', $pg2)) throw new RuntimeException('eoc sheet: fund script changed');
+    $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    return '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>' . $e('البيان العام ' . ($cStaff['sy'] ?? '')) . '</title><style>' . eocSheetCss('general')
+         . ' .ba-sec{position:relative} .ba-sec + .ba-sec{page-break-before:always;break-before:page} @media screen{ .ba-sec + .ba-sec{margin-top:28px;border-top:3px double #33405c;padding-top:14px} }</style></head><body>'
+         . '<div class="toolbar"><button onclick="window.print()">🖨 طباعة</button></div>' . implode('', $secs)
+         . '<script type="text/javascript">' . $fit . '</script><script type="text/javascript">' . $pg2 . "\n" . 'Array.prototype.slice.call(document.querySelectorAll(".ba-sec")).forEach(eocPaginate);</script></body></html>';
+}
+
+/**
+ * 📝 وورد «طبق ورقة الصندوق» (2026-11-17 «صحّح الكل متل الصندوق»): نفس محتوى الورقة وترتيبها بمستند يفتحه وورد ويُعدَّل فيه.
+ * يُبنى من ورقة eocSheetHtml نفسها (مصدر واحد): تُشال السكربتات وشريط الطباعة، والترويسة/التواقيع (flex) تصير جداول لأنّ وورد لا يفهم flex؛
+ * تقسيم الصفحات وتكرار رأس الجدول يتولّاهما وورد. $docs = ورقة واحدة أو عدّة أوراق (العام: ملاك ثمّ متعاقدين، كل واحدة بصفحة جديدة).
+ */
+function eocSheetWordDoc(array $docs, string $title): string {
+    $parts = []; $css = '';
+    foreach ($docs as $d) {
+        if (!preg_match('#<style>(.*?)</style>#su', $d, $mc) || !preg_match('#<body>(.*)</body>#su', $d, $m)) throw new RuntimeException('eoc sheet: word');
+        $css = $mc[1]; $b = preg_replace('#<script\b.*?</script>#su', '', $m[1]); $b = preg_replace('#<div class="toolbar">.*?</div>#su', '', $b, 1);
+        $b = preg_replace('#<div class="ba-note-src".*?</table>\s*</div>#su', '', $b);
+        $b = preg_replace('#<div class="(b[am])-top"><div class="b[am]-title">(.*?)</div><div class="b[am]-desc">(.*?)</div></div>#su',
+            '<table class="w-top" dir="rtl" width="100%" cellspacing="0" cellpadding="0"><tr><td class="$1-title" width="60%" align="right" valign="top">$2</td><td class="$1-desc" width="40%" align="left" valign="top">$3</td></tr></table>', $b, 1, $c1);
+        $b = preg_replace('#<div class="bm-sign"><div>(.*?)</div><div>(.*?)</div><div>(.*?)</div></div>#su',
+            '<table class="w-sign" dir="rtl" width="100%" cellspacing="0" cellpadding="0"><tr><td width="33%" align="center" valign="top">$1<br/><br/><br/></td><td width="34%" align="center" valign="top">$2</td><td width="33%" align="center" valign="top">$3</td></tr></table>', $b);
+        if ($c1 !== 1) throw new RuntimeException('eoc sheet: word header');
+        $b = str_replace(['<table class="bm">', '<table class="ba">', '<table class="ba-sign">', '<table class="bm-foot">', '<table class="bm-sum">'],
+                         ['<table class="bm" dir="rtl" width="100%" border="1" cellspacing="0" cellpadding="2">', '<table class="ba" dir="rtl" width="100%" border="1" cellspacing="0" cellpadding="2">', '<table class="ba-sign" dir="rtl" width="100%">', '<table class="bm-foot" dir="rtl" width="100%">', '<table class="bm-sum" dir="rtl">'], $b);
+        $b = preg_replace('#<td class="sign"></td>#', '<td class="sign">&nbsp;</td>', $b); $b = preg_replace('#<td class="name"></td>#', '<td class="name">&nbsp;</td>', $b); $b = str_replace('<td></td>', '<td>&nbsp;</td>', $b);
+        // أرقام لاتينية كالورقة (وورد يقلبها هندية بالنصّ العربي): كل رقم/تاريخ/مبلغ بنصّ الورقة يُعلَّم لغة EN واتجاه LTR
+        $b = preg_replace_callback('#>([^<]+)<#u', fn($t) => '>' . preg_replace('#\d[\d,./\-]*\d|\d#u', '<span lang="EN-US" dir="ltr" style="mso-ansi-language:EN-US;mso-bidi-language:EN-US">$0</span>', $t[1]) . '<', $b);
+        $parts[] = $b;
+    }
+    $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    $wcss = '@page WordSection1{size:595.3pt 841.9pt;margin:19.85pt 19.85pt 19.85pt 19.85pt;mso-header-margin:0;mso-footer-margin:0;mso-paper-source:0}'
+          . ' div.WordSection1{page:WordSection1} body,table,td,th,div,span{font-family:"Segoe UI","Arial",sans-serif}'
+          . ' table.w-top td,table.w-sign td{border:0;padding:0} table.w-sign{margin-top:8px;font-size:12px} table.bm thead th,table.ba thead th{mso-yfti-irow:0}'
+          . ' td.sign{height:20pt} table.bm,table.ba{mso-table-layout-alt:fixed}';
+    $css = preg_replace('#@page\{[^}]*\}#u', '', $css); $css = preg_replace('#@media (screen|print)\{.*?\}\s*\}#su', '', $css);
+    return "\xEF\xBB\xBF" . '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40" dir="rtl" lang="ar"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>'
+         . '<title>' . $e($title) . '</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]--><style>' . $css . $wcss . '</style></head>'
+         . '<body dir="rtl"><div class="WordSection1" dir="rtl">' . implode('<br clear="all" style="mso-special-character:line-break;page-break-before:always"/>', $parts) . '</div></body></html>';
+}
+
+/** لا خدمة PDF ⇒ الورقة نفسها مع فتح حوار الطباعة تلقائياً («حفظ بصيغة PDF» من المتصفّح) */
+function eocSheetAutoPrint(string $html): string { return str_replace('</body>', '<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},600)});</script></body>', $html); }
