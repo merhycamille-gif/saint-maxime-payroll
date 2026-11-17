@@ -40,14 +40,16 @@
   const pagerPages = (doc) => Array.from((doc || document).querySelectorAll('.sp-pager a.sp-page')).map((a) => +(((a.getAttribute('href') || '').match(/[?&]page=(\d+)/) || [])[1] || 0)).filter(Boolean);
   const pagerCur = (doc) => { const on = (doc || document).querySelector('.sp-pager a.sp-page-on'); return on ? (+digits(on.textContent) || 1) : 1; };
   const pagerTotal = (doc) => { const el = (doc || document).querySelector('.sp-pager-total'); const m = el ? String(el.textContent).match(/(\d+)/) : null; return m ? +m[1] : -1; };
-  function isMulti() { return page() === 'roster' && Math.max(0, ...pagerPages()) > 1; }
+  /* 📄 (2026-11-17 عبرا، البيان المالي 137 سطراً على 5 صفحات): البيان المالي مقسّم صفحات مثل العام (كان يُقرأ منه أوّل 30 فقط ⇒ «ناقصون 107» وهم موجودون) ⇒ نفس القراءة الكاملة. */
+  const listQS = () => (page() === 'financial' ? '?sort=name&search=&page=' : '?sort=name&emp=all&page=');
+  function isMulti() { const p = page(); return (p === 'roster' || p === 'financial') && Math.max(0, ...pagerPages()) > 1; }
   async function ensureAll() {
     ALLROWS = null; MULTI_ERR = '';
     if (!isMulti()) return true;
     try {
       let last = Math.max(...pagerPages()); const out = []; let total = -1;
       for (let k = 1; k <= last; k++) {
-        const r = await fetch(baseUrl() + '?sort=name&emp=all&page=' + k, { credentials: 'same-origin', cache: 'no-store' });
+        const r = await fetch(baseUrl() + listQS() + k, { credentials: 'same-origin', cache: 'no-store' });
         if (!r.ok) throw new Error('الصفحة ' + k + ' لم تنفتح (' + r.status + ')');
         const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
         const t = doc.querySelector('#sp-list table.sp-data');
@@ -137,6 +139,7 @@
   function siteFiltered() {
     const emp = new URL(location.href).searchParams.get('emp') || ''; const sel = document.getElementById('sp-emp');
     if (emp === 'staff' || emp === 'contract' || (sel && sel.value && sel.value !== 'all')) return true;
+    if (page() === 'financial' && (new URL(location.href).searchParams.get('search') || '').trim()) return true;   // بحث بالبيان المالي = لائحة جزئية
     const m = String(document.body ? document.body.textContent : '').match(/(\d+)\s*من\s*[أا]صل\s*(\d+)/);
     return !!m && m[1] !== m[2];
   }
@@ -300,7 +303,7 @@
         const df = document.querySelector('form[action*="/line/' + d.lineId + '/delete"]');
         // 📄 سطره بصفحة أخرى من القائمة ⇒ افتح صفحته أوّلاً (مرّتان كحدّ أقصى) ثمّ شِله بنموذج الموقع نفسه
         if (!df && isMulti()) { const rr = siteRows().find((x) => x.lineId === String(d.lineId));
-          if (rr && rr.page && (Q.delNav || 0) < 2) { Q.delNav = (Q.delNav || 0) + 1; await chrome.storage.local.set({ eocAuto: Q }); location.href = Q.base + '?sort=name&emp=all&page=' + rr.page; return; } }
+          if (rr && rr.page && (Q.delNav || 0) < 2) { Q.delNav = (Q.delNav || 0) + 1; await chrome.storage.local.set({ eocAuto: Q }); location.href = Q.base + listQS() + rr.page; return; } }
         Q.delNav = 0; Q.delIdx = (Q.delIdx || 0) + 1;
         if (!df) { Q.errors.push(d.name + ' (لم يُعثر على سطره لشيله)'); await chrome.storage.local.set({ eocAuto: Q }); return autoStep(Q, 1); }
         Q.deleted = (Q.deleted || 0) + 1; expect('gdel', d.name); await chrome.storage.local.set({ eocAuto: Q });
