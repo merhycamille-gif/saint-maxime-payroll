@@ -145,6 +145,7 @@ if (($_GET['export'] ?? '') === 'sheet' && $data && $validPeriod) {
         $shEmp = in_array($emp, ['contract', 'both'], true) ? $emp : 'staff';
         $shAll = eocGeneralRows($db, $ids, $period, $data);   // كل الأساتذة (بلا بحث الشاشة)
         foreach ($shAll as &$shR) { $shR['certificate'] = eocCertOptions()[(int)$shR['certificate_id']] ?? ''; $shR['category'] = eocCatOptions()[(int)$shR['category_id']] ?? ''; $shR['phase'] = eocPhaseOptions()[(int)$shR['phase_id']] ?? ''; } unset($shR);
+        usort($shAll, fn($x, $y) => strcmp((string)$x['teacher_name'], (string)$y['teacher_name']));   // ترتيب ورقة الموقع بالبيان العام: الاسم كما هو مكتوب حرفياً (أ ثمّ إ ثمّ ا)
         $shOf = fn($t) => array_values(array_filter($shAll, fn($r) => $r['employment_type'] === $t));
         $shHtml = $shEmp === 'both' ? eocSheetGeneralBoth($shC + ['sy' => $period, 'rows' => $shOf('staff')], $shC + ['sy' => $period, 'rows' => $shOf('contract')])
                                     : eocSheetHtml('general', $shC + ['sy' => $period, 'emp' => $shEmp, 'rows' => $shOf($shEmp)]);
