@@ -11315,7 +11315,7 @@ try {
     $t291 = $thTxt184($h291);
     $okHead291 = $has184($t291, 'التعويضات العائلية ⏎ 6 %') && $has184($t291, 'نهاية الخدمة ⏎ 8.5 %') && $has184($t291, 'مجموع حصّة المدرسة') && stripos($h291, 'Fatal error') === false;
     // القيم من القاعدة: الموظفون الخاضعون بالمدرسة 3 بتشرين 2026
-    $q291 = $db->query("SELECT e.employee_type t, SUM(ms.school_cnss_8_lbp) c8, SUM(ms.school_family_comp_6_lbp) f6, SUM(ms.school_end_of_service_8_5_lbp) e85
+    $q291 = $db->query("SELECT e.employee_type t, SUM(ms.school_cnss_8_lbp) c8, SUM(ms.school_family_comp_6_lbp) f6, SUM(ms.school_end_of_service_8_5_lbp) e85, SUM(ms.cnss_amount_lbp) c3, SUM(ms.family_allowance_lbp) fa
         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE ms.year = 2026 AND ms.month = 10 AND e.school_id = 3 AND e.is_deleted = 0 AND e.cnss_subject = 1 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)
         GROUP BY e.employee_type")->fetchAll(PDO::FETCH_ASSOC);
@@ -11327,12 +11327,18 @@ try {
     $okEmpTot291 = preg_match('/مجموع الموظفين.*?<\/tr>/su', $h291, $mE) === 1
         && strpos($mE[0], $fmt291($emp291['f6'])) !== false && strpos($mE[0], $fmt291($emp291['e85'])) !== false
         && strpos($mE[0], $fmt291((int)$emp291['c8'] + (int)$emp291['f6'] + (int)$emp291['e85'])) !== false;
-    $okDash291 = preg_match('/<tr class="cat-row"><td[^>]*>المتعاقد(?:ين|ون)<\/td><\/tr>\s*<tr>(.*?)<\/tr>/su', $h291, $mC) === 1 && substr_count($mC[1], '>—</td>') === 2;
+    $okDash291 = preg_match('/<tr class="cat-row"><td[^>]*>المتعاقد(?:ين|ون)<\/td><\/tr>\s*<tr>(.*?)<\/tr>/su', $h291, $mC) === 1 && substr_count($mC[1], '>—</td>') === 3; // + «تعويضات عائلية مدفوعة» (2026-11-18)
     // الإكسل: الرؤوس النصّية بالنسبة
     $x291 = $sheet184(renderPage('pages/reports_export.php', ['report' => 'cnss_summary', 'month' => 10, 'year' => 2026, 'format' => 'xlsx'], ['extra', 'aide'], [3], 'lbp', '2026-2027', $PROJ . '/tools/_r291.xlsx'));
     $okXls291 = strpos($x291, 'التعويضات العائلية 6 %') !== false && strpos($x291, 'نهاية الخدمة 8.5 %') !== false && strpos($x291, 'مجموع حصّة المدرسة') !== false;
-    $ok291 = $okHead291 && $okData291 && $okEmpTot291 && $okDash291 && $okXls291;
-    $why291 = 'head=' . (int)$okHead291 . ' data=' . (int)$okData291 . ' empTot=' . (int)$okEmpTot291 . ' dash=' . (int)$okDash291 . ' xls=' . (int)$okXls291 . ' f6=' . $fmt291($emp291['f6']) . ' e85=' . $fmt291($emp291['e85']);
+    // 🧾 (2026-11-18 «بدّي 1 والآخر») + مجموع الاشتراكات المستحقة (3٪ + حصّة المدرسة) · تعويضات عائلية مدفوعة · الباقي المتوجب للصندوق — بالشاشة والإكسل والمجاميع
+    $due291 = (int)$emp291['c3'] + (int)$emp291['c8'] + (int)$emp291['f6'] + (int)$emp291['e85'];
+    $okDue291 = $has184($t291, 'مجموع الاشتراكات المستحقة') && $has184($t291, 'تعويضات عائلية مدفوعة') && $has184($t291, 'الباقي المتوجب للصندوق')
+        && isset($mE[0]) && strpos($mE[0], $fmt291($due291)) !== false && strpos($mE[0], $fmt291($due291 - (int)$emp291['fa'])) !== false
+        && strpos($x291, 'مجموع الاشتراكات المستحقة') !== false && strpos($x291, 'تعويضات عائلية مدفوعة') !== false && strpos($x291, 'الباقي المتوجب للصندوق') !== false
+        && strpos((string)file_get_contents($PROJ . '/assets/js/doclang.js'), "'الباقي المتوجب للصندوق': 'Solde dû à la Caisse'") !== false;
+    $ok291 = $okHead291 && $okData291 && $okEmpTot291 && $okDash291 && $okXls291 && $okDue291;
+    $why291 = 'head=' . (int)$okHead291 . ' data=' . (int)$okData291 . ' empTot=' . (int)$okEmpTot291 . ' dash=' . (int)$okDash291 . ' xls=' . (int)$okXls291 . ' due=' . (int)$okDue291 . ' f6=' . $fmt291($emp291['f6']) . ' e85=' . $fmt291($emp291['e85']);
 } catch (Throwable $e) { $ok291 = false; $why291 = $e->getMessage(); }
 check('🛡️ كشف الضمان الشهري (2026-11-08): عمودا التعويضات العائلية 6٪ ونهاية الخدمة 8.5٪ للموظفين (الأستاذ —) + مجموع حصّة المدرسة = 8+6+8.5 — بالشاشة والإكسل مع النسب المؤرَّخة والمجاميع', $ok291, $why291);
 
