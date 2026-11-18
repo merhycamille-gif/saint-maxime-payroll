@@ -12096,6 +12096,29 @@ try {
         $r1 && $r2 && $r3 && $r4 && $save && $img && $eOk && $tOk, 'rule=' . (int)($r1 && $r2 && $r3 && $r4) . ' save=' . (int)$save . ' img=' . (int)$img . ' · ' . $det);
 } catch (Throwable $e) { check('🪪 (2026-11-18) بطاقة الموظف غير المعلّم', false, $e->getMessage()); }
 
+/* 🧢 (2026-11-18 «وقت منحطّ سقف منحطّ ابتداءً من تاريخ وبيضلّ يطبَّق حتى نرجع نغيّر» — «على كل الفروع») راتب مخزَّن غير مدفوع بالسنة الجارية لا يتخطّى سقف فرعه الساري بتاريخ شهره */
+try {
+    $cy = currentSchoolYear(); $bad = []; $nRows = 0;
+    $rs = $db->query("SELECT ms.id, ms.month, ms.year, ms.school_cnss_8_lbp c8, ms.school_family_comp_6_lbp f6, ms.school_end_of_service_8_5_lbp e85, e.employee_code
+        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE e.is_deleted = 0 AND ms.school_year = " . $db->quote($cy) . " AND COALESCE(ms.is_paid,0) = 0 AND (ms.school_cnss_8_lbp > 0 OR ms.school_family_comp_6_lbp > 0 OR ms.school_end_of_service_8_5_lbp > 0)");
+    while ($r = $rs->fetch(PDO::FETCH_ASSOC)) {
+        $nRows++; $m = (int)$r['month']; $y = (int)$r['year'];
+        foreach ([['c8', 'maladie_maternite', 'cnss_employer_rate', 8], ['f6', 'allocations_familiales', 'family_compensation_rate', 6], ['e85', 'fin_de_service', 'end_of_service_rate', 8.5]] as [$col, $br, $rk, $rd]) {
+            $b = getCnssBracket($br, $m, $y); if (!$b || $b['max_salary_lbp'] === null) continue;
+            $max = floor((float)$b['max_salary_lbp'] * (getRateAsOf($rk, $m, $y, $rd) / 100));
+            if ((int)$r[$col] > $max + 1) $bad[] = $r['employee_code'] . ' ' . $y . '-' . $m . ' ' . $col . '=' . $r[$col] . '>' . $max;
+        }
+    }
+    // السقف بلا تاريخ نهاية يبقى سارياً لأيّ شهر لاحق، والسقف الأحدث هو الذي يحكم من تاريخه
+    $bNow = getCnssBracket('allocations_familiales', 10, 2026); $bFar = getCnssBracket('allocations_familiales', 9, 2031); $bOld = getCnssBracket('allocations_familiales', 3, 2026);
+    $carry = $bNow && $bFar && (int)$bNow['id'] === (int)$bFar['id'] && $bOld && (int)$bOld['id'] !== (int)$bNow['id'] && $bOld['effective_from'] < $bNow['effective_from'];
+    $save = strpos((string)file_get_contents($PROJ . '/pages/social_security.php'), 'recalcSalariesInRange($db, $from, $to)') !== false
+         && strpos((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), "clampCnssBase(\$cnssBase, 'allocations_familiales'") !== false;
+    check('🧢 (2026-11-18) سقف الضمان المؤرَّخ على كل الفروع: لا راتب مخزَّناً غير مدفوع بالسنة الجارية فوق سقف فرعه، والسقف يبقى سارياً حتى سقف بتاريخ جديد، والحفظ يعيد الحسبة',
+        !$bad && $carry && $save && $nRows > 0, 'rows=' . $nRows . ' فوق السقف=' . count($bad) . ($bad ? ' (' . implode(' · ', array_slice($bad, 0, 5)) . ')' : '') . ' carry=' . (int)$carry . ' save=' . (int)$save);
+} catch (Throwable $e) { check('🧢 (2026-11-18) سقف الضمان المؤرَّخ على كل الفروع', false, $e->getMessage()); }
+
 /* ⏱️ قياس الوقت (اختياري: REG_TIMING=1) */
 if (getenv('REG_TIMING')) {
     $tl = "sec\trender_sec\trenders\tcheck\n";
