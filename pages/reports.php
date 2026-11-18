@@ -53,13 +53,14 @@ $selectedNames = (function() {
 })();
 
 // تصدير Excel/Word حقيقي منسّق عبر الخادم (reports_export.php) لهذه التقارير
-$exportableReports = ['monthly_summary','cnss_summary','tax_summary','eoc_summary','employee_list','annual_totals','new_teachers'];
+$exportableReports = ['monthly_summary','cnss_summary','tax_summary','eoc_summary','employee_list','annual_totals','dues_summary','new_teachers'];
 if ($report && in_array($report, $exportableReports, true)) {
     $qs = http_build_query(array_filter([
         'report' => $report, 'month' => $month, 'year' => $year,
         'school_year' => $schoolYear,
         'tax_sub' => $_GET['tax_sub'] ?? null,
-    ], fn($v) => $v !== null && $v !== '')) . empTypeQueryFrom($empTypeState); // ☑️ الفئات المشيّكة تصل للتصدير
+        'per' => $_GET['per'] ?? null, 'q' => $_GET['q'] ?? null, 'rate' => $_GET['rate'] ?? null, 'kinds_set' => $_GET['kinds_set'] ?? null, // 🧾 المتوجّبات حسب المدرسة
+    ], fn($v) => $v !== null && $v !== '')) . (($report === 'dues_summary' && !empty($_GET['kinds']) && is_array($_GET['kinds'])) ? '&' . http_build_query(['kinds' => array_values($_GET['kinds'])]) : '') . empTypeQueryFrom($empTypeState); // ☑️ الفئات المشيّكة تصل للتصدير
     $colsQ = '';
     if (!empty($_GET['cols']) && is_array($_GET['cols'])) foreach ($_GET['cols'] as $c) $colsQ .= '&cols[]=' . urlencode($c);
     if (!empty($_GET['items']) && is_array($_GET['items'])) foreach ($_GET['items'] as $c) $colsQ .= '&items[]=' . urlencode($c); // بنود المجاميع السنوية المختارة
@@ -417,6 +418,46 @@ function reportDocThumb($path) {
                         if ($data && $curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
                         if (!$data): ?><tr><td colspan="<?= ($multi?15:14) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
                         <?php if ($data) $drawTotal('المجموع العام — العدد: '.$rn, $G, true); ?>
+                    </tbody>
+                </table></div>
+        <?= docSheetEnd() ?>
+    <?php elseif ($report === 'dues_summary'):
+        /* 🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة — كملفّه «SR GLADIS CNSS»: المصدر الواحد duesParams/duesRows (report_helpers.php) */
+        $P = duesParams(); $dRows = duesRows($db, $P); $dK = $P['kinds']; $dLab = duesKinds(); $dMulti = count($dK) > 1;
+        $dUsd = fn($v) => nfc($v / $P['rate'], 2);
+    ?>
+        <form method="GET" class="card no-print">
+            <input type="hidden" name="report" value="dues_summary"><input type="hidden" name="kinds_set" value="1">
+            <div class="card-body form-row cols-3">
+                <div class="form-group mb-0"><label class="form-label">Période / الفترة</label><select name="per" class="form-select" onchange="var q=this.value==='quarter';document.getElementById('duesM').style.display=q?'none':'';document.getElementById('duesQ').style.display=q?'':'none'"><option value="month" <?= $P['per'] === 'month' ? 'selected' : '' ?>>Mois / شهر</option><option value="quarter" <?= $P['per'] === 'quarter' ? 'selected' : '' ?>>Trimestre / فصل</option></select></div>
+                <div class="form-group mb-0" id="duesM" style="<?= $P['per'] === 'quarter' ? 'display:none' : '' ?>"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$P['month']?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
+                <div class="form-group mb-0" id="duesQ" style="<?= $P['per'] === 'quarter' ? '' : 'display:none' ?>"><label class="form-label">Trimestre / الفصل</label><select name="q" class="form-select"><?php for($qq=1;$qq<=4;$qq++): ?><option value="<?=$qq?>" <?=$qq===$P['q']?'selected':''?>><?= $qq ?> — <?= e(monthName(($qq-1)*3+1)) ?> – <?= e(monthName(($qq-1)*3+3)) ?></option><?php endfor; ?></select></div>
+                <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= (int)$P['year'] ?>"></div>
+                <div class="form-group mb-0"><label class="form-label">1 $ = ? L.L / سعر الدولار</label><input type="text" name="rate" class="form-control" inputmode="decimal" value="<?= e(nfc($P['rate'], 2)) ?>"></div>
+                <div class="form-group mb-0"><label class="form-label">Afficher / شو بدّك تشوف</label>
+                    <div class="school-checks"><?php foreach ($dLab as $kk => $kl): ?><label class="chk"><input type="checkbox" name="kinds[]" value="<?= $kk ?>" <?= in_array($kk, $dK, true) ? 'checked' : '' ?>> <?= e($kl) ?></label><?php endforeach; ?></div></div>
+                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
+                <?php reportSchoolPicker(); ?>
+            </div>
+        </form>
+        <?= docSheetStart('Montants dus par école', 'المتوجّبات حسب المدرسة', [$P['label']['fr'] . ' / ' . $P['label']['ar'], '1 $ = ' . nfc($P['rate'], 2) . ' L.L'], ['month' => $P['months'][0], 'year' => $P['year'], 'comp' => false]) ?>
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
+                    <thead><tr><th>#</th><th>المدرسة</th><?php foreach ($dK as $kk): ?><th><?= e($dLab[$kk]) ?></th><th><?= e($dLab[$kk]) ?><br><small style="font-weight:400">$</small></th><?php endforeach; ?><?php if ($dMulti): ?><th style="background:#4338ca">المجموع</th><th style="background:#4338ca">المجموع<br><small style="font-weight:400">$</small></th><?php endif; ?></tr></thead>
+                    <tbody>
+                        <?php $dT = array_fill_keys($dK, 0); $dG = 0; $rn = 0;
+                        foreach ($dRows as $r): $rowT = 0; ?>
+                            <tr><td><?= ++$rn ?></td><td style="text-align:start;font-weight:600"><?= e($r['fr'] . ' / ' . $r['ar']) ?></td>
+                                <?php foreach ($dK as $kk): $v = (int)$r[$kk]; $dT[$kk] += $v; $rowT += $v; ?><td><?= $v ? nfc($v, 0) : '' ?></td><td><?= $v ? $dUsd($v) : '' ?></td><?php endforeach; ?>
+                                <?php if ($dMulti): $dG += $rowT; ?><td style="background:#eef2ff"><strong><?= $rowT ? nfc($rowT, 0) : '' ?></strong></td><td style="background:#eef2ff"><strong><?= $rowT ? $dUsd($rowT) : '' ?></strong></td><?php endif; ?>
+                            </tr>
+                        <?php endforeach;
+                        if (!$dK): ?><tr><td colspan="2" class="text-center text-muted">علِّم نوعاً واحداً على الأقلّ (الضمان / صندوق التعويضات / المالية)</td></tr>
+                        <?php elseif ($dRows): ?>
+                            <tr class="total-row" style="font-weight:700"><td colspan="2" style="text-align:start">Total / المجموع</td>
+                                <?php foreach ($dK as $kk): ?><td><?= nfc($dT[$kk], 0) ?></td><td><?= $dUsd($dT[$kk]) ?></td><?php endforeach; ?>
+                                <?php if ($dMulti): ?><td style="background:#eef2ff"><strong><?= nfc($dG, 0) ?></strong></td><td style="background:#eef2ff"><strong><?= $dUsd($dG) ?></strong></td><?php endif; ?>
+                            </tr>
+                        <?php endif; ?>
                     </tbody>
                 </table></div>
         <?= docSheetEnd() ?>

@@ -1058,3 +1058,69 @@ function annualTotalRateHead(string $key, ?string $sy): string {
     $rk = annualTotalItems()[$key]['rk'] ?? '';
     return $rk === '' ? '' : contribHead($rk, null, null, $sy);
 }
+
+/* ============================================================================================================
+ * 🧾🏫 (2026-11-18) «المتوجّبات حسب المدرسة» — كملفّه «SR GLADIS CNSS septembre 2026»: سطر لكل مدرسة بما يتوجّب عليها
+ *   للضمان / لصندوق التعويضات / للمالية عن شهر أو فصل يختاره، مع مقابله بالدولار بالسعر الذي يكتبه.
+ *   المصدر الواحد للشاشة (reports.php?report=dues_summary) والإكسل (reports_export.php) — والمبالغ = مجاميع الكشوف الشهرية الثلاثة بالحرف:
+ *     الضمان  = كشف الضمان الشهري «الباقي المتوجب للصندوق» (3٪ + 8٪ + [موظف: 6٪ + 8,5٪] − [موظف: التعويض العائلي المدفوع])
+ *     الصندوق = كشف الصندوق الشهري (6٪ الأستاذ + درجة/نصف راتب + 6٪ المدرسة) — الملاك
+ *     المالية = كشف الضريبة الشهري (ضريبة الدخل المحسومة) — الخاضعون للضريبة
+ * ============================================================================================================ */
+/** الأسماء المختصرة كما يكتبها بملفّه (وجهان «FR / AR» — doclang يُظهر وجه لغة التقرير)، وبترتيب ملفّه؛ غير المذكور = اسم المدرسة. */
+function duesSchoolShortNames(): array {
+    return [3 => ['Hadath', 'الحدث'], 4 => ['ABRA', 'عبرا'], 5 => ['Joun', 'جون'], 6 => ['Furzol', 'الفرزل'], 7 => ['Ablah', 'أبلح'], 9 => ['Couvent', 'الدير'],
+            12 => ['Yaroun', 'يارون'], 19 => ['Couvent Jeita', 'دير جعيتا'], 13 => ['Maximos Abra', 'مكسيموس عبرا'], 11 => ['Ksara', 'كسارة'],
+            18 => ['Physiothérapie', 'العلاج الفيزيائي'], 20 => ['Damour', 'الدامور'], 2 => ['Maximos', 'مكسيموس']];
+}
+function duesKinds(): array { return ['cnss' => 'الضمان', 'eoc' => 'صندوق التعويضات', 'tax' => 'المالية']; }
+/** يقرأ خيارات التقرير من الرابط: الفترة (شهر/فصل)، الأنواع المشيّكة، سعر الدولار. */
+function duesParams(): array {
+    $per = (($_GET['per'] ?? 'month') === 'quarter') ? 'quarter' : 'month';
+    $month = max(1, min(12, (int)($_GET['month'] ?? date('n')))); $year = (int)($_GET['year'] ?? date('Y'));
+    $q = max(1, min(4, (int)($_GET['q'] ?? (int)ceil($month / 3))));
+    $months = $per === 'quarter' ? [($q - 1) * 3 + 1, ($q - 1) * 3 + 2, ($q - 1) * 3 + 3] : [$month];
+    // ☑️ المشيّك فقط يبيّن؛ أوّل فتحة (بلا kinds_set) = الثلاثة
+    $kinds = isset($_GET['kinds_set']) ? array_values(array_intersect(array_keys(duesKinds()), (array)($_GET['kinds'] ?? []))) : array_keys(duesKinds());
+    $rate = numLoose($_GET['rate'] ?? ''); if ($rate <= 0) $rate = (float)getExchangeRate($months[0], $year);
+    $mAr = array_map(fn($m) => monthName($m, 'ar'), $months); $mFr = array_map(fn($m) => monthName($m, 'fr'), $months);
+    $label = $per === 'quarter'
+        ? ['fr' => 'Trimestre ' . $q . ' ' . $year . ' (' . $mFr[0] . ' – ' . $mFr[2] . ')', 'ar' => 'الفصل ' . $q . ' ' . $year . ' (' . $mAr[0] . ' – ' . $mAr[2] . ')']
+        : ['fr' => $mFr[0] . ' ' . $year, 'ar' => $mAr[0] . ' ' . $year];
+    return ['per' => $per, 'month' => $month, 'q' => $q, 'year' => $year, 'months' => $months, 'kinds' => $kinds, 'rate' => $rate, 'label' => $label];
+}
+/** المبالغ: [school_id => ['cnss'=>, 'eoc'=>, 'tax'=>]] لأشهر الفترة — نفس شروط الكشوف الشهرية الثلاثة (المدارس المشيّكة + موظفو السنة المعروضة). */
+function duesBySchool(PDO $db, array $months, int $year): array {
+    $in = implode(',', array_map('intval', $months)); $m0 = (int)$months[0];
+    $sy = ($m0 >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) . '-' . $year);
+    [$yf, $yp] = yearEmploymentFilter($sy, 'e.');
+    $base = " FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+              WHERE ms.year = ? AND ms.month IN ($in) AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)";
+    $sch = reportSchoolSql('ms.school_id'); $out = [];
+    $run = function (string $k, string $expr, string $cond) use ($db, $base, $sch, $yf, $yp, $year, &$out) {
+        $st = $db->prepare("SELECT e.school_id sid, COALESCE(SUM($expr), 0) v" . $base . $cond . $sch . $yf . " GROUP BY e.school_id");
+        $st->execute(array_merge([$year], $yp));
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $sid = (int)$r['sid']; $out[$sid] = ($out[$sid] ?? []) + ['cnss' => 0, 'eoc' => 0, 'tax' => 0]; $out[$sid][$k] = (int)round((float)$r['v']); }
+    };
+    $run('cnss', "ms.cnss_amount_lbp + ms.school_cnss_8_lbp + IF(e.employee_type = 'employe', ms.school_family_comp_6_lbp + ms.school_end_of_service_8_5_lbp - ms.family_allowance_lbp, 0)", " AND e.cnss_subject = 1");
+    $run('eoc', "ms.caisse_amount_lbp + ms.eoc_grade_lbp + ms.school_eoc_6_lbp", " AND e.employee_type = 'enseignant_titulaire'");
+    $run('tax', "ms.income_tax_lbp", " AND e.tax_subject = 1");
+    return $out;
+}
+/** صفوف التقرير بترتيب ملفّه: كل مدرسة مشيّكة (حتى لو صفر) ⇒ ['sid','fr','ar','cnss','eoc','tax']. */
+function duesRows(PDO $db, array $P): array {
+    $data = duesBySchool($db, $P['months'], $P['year']);
+    $ids = selectedReportSchoolIds(); if (empty($ids)) $ids = allActiveSchoolIdsCached();
+    $ids = array_values(array_unique(array_map('intval', (array)$ids)));
+    foreach (array_keys($data) as $sid) if (!in_array($sid, $ids, true)) $ids[] = $sid;
+    $short = duesSchoolShortNames(); $ord = array_flip(array_keys($short));
+    usort($ids, fn($a, $b) => [$ord[$a] ?? 999, $a] <=> [$ord[$b] ?? 999, $b]);
+    $rows = [];
+    foreach ($ids as $sid) {
+        if ($sid <= 0) continue;
+        $fr = $short[$sid][0] ?? (string)schoolNameById($sid, 'fr'); $ar = $short[$sid][1] ?? (string)schoolNameById($sid, 'ar');
+        $rows[] = ['sid' => $sid, 'fr' => $fr, 'ar' => $ar] + (($data[$sid] ?? []) + ['cnss' => 0, 'eoc' => 0, 'tax' => 0]);
+    }
+    return $rows;
+}
+

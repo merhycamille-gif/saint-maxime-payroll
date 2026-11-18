@@ -21,6 +21,7 @@ function reportCenterCategories(): array {
         // 🏛️🖼️ (2026-10-18) gov-ic = شعار الجهة الرسمية محلّ الأيقونة (الضمان/المالية/الصندوق — app.css قسم 500)
         ['title'=>'الضمان الاجتماعي / CNSS', 'icon'=>'gov-ic gov-cnss', 'color'=>'var(--info)', 'tiles'=>[
             ['url'=>'?report=cnss_summary', 'icon'=>'fa-list', 'color'=>'var(--info)', 'fr'=>'CNSS mensuel', 'ar'=>'كشف ضمان شهري'],
+            ['url'=>'?report=dues_summary', 'icon'=>'fa-school-circle-check', 'color'=>'var(--primary)', 'fr'=>'Montants dus par école (CNSS · Caisse · Impôt)', 'ar'=>'المتوجّبات حسب المدرسة (ضمان · صندوق · مالية)'],   // 🧾🏫 (2026-11-18)
             ['url'=>$OF.'cnss_nominative_monthly', 'icon'=>'fa-table-list', 'color'=>'var(--success)', 'fr'=>'Bordereau nominatif mensuel', 'ar'=>'كشف اشتراكات الضمان الشهري (اسمي)'],
             ['url'=>$OF.'cnss_annual', 'icon'=>'fa-file-contract', 'color'=>'var(--primary)', 'fr'=>'Décl. annuelle nominative', 'ar'=>'التصريح الاسمي السنوي'],
             ['url'=>$OF.'cnss_employ', 'icon'=>'fa-user-plus', 'color'=>'var(--success)', 'fr'=>'Emploi d\'un salarié', 'ar'=>'إعلام عن استخدام أجير'],

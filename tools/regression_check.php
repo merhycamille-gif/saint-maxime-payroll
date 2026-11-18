@@ -12125,6 +12125,47 @@ try {
         !$bad && $carry && $save && $nRows > 0, 'rows=' . $nRows . ' فوق السقف=' . count($bad) . ($bad ? ' (' . implode(' · ', array_slice($bad, 0, 5)) . ')' : '') . ' carry=' . (int)$carry . ' save=' . (int)$save);
 } catch (Throwable $e) { check('🧢 (2026-11-18) سقف الضمان المؤرَّخ على كل الفروع', false, $e->getMessage()); }
 
+/* 🧾🏫 (2026-11-18) «المتوجّبات حسب المدرسة» (كملفّه SR GLADIS CNSS): شهر أو فصل · ضمان/صندوق/مالية بالتشييك · سعر الدولار · سطر لكل مدرسة + المجموع — والأرقام = مجاميع الكشوف الشهرية الثلاثة */
+try {
+    require_once $PROJ . '/includes/report_helpers.php';
+    $fmtD = fn($v) => number_format((int)$v);
+    $cellsD = function (string $h): array { $o = []; if (preg_match('/<table class="doc-table".*?<\/table>/su', $h, $m)) { preg_match_all('/<tr[^>]*>(.*?)<\/tr>/su', $m[0], $rs);
+        foreach ($rs[1] as $r) { preg_match_all('/<t[hd][^>]*>(.*?)<\/t[hd]>/su', $r, $cs); $o[] = array_map(fn($c) => trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($c), ENT_QUOTES, 'UTF-8'))), $cs[1]); } } return $o; };
+    // (أ) شهر، مدرسة واحدة (3)، الثلاثة: الضمان = «الباقي المتوجب للصندوق» بكشف الضمان الشهري لنفس المدرسة
+    $hD = renderPage('pages/reports.php', ['report' => 'dues_summary', 'per' => 'month', 'month' => 10, 'year' => 2026, 'rate' => '89500', 'schools' => [3]], ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $tD = $cellsD($hD); $rowD = $tD[1] ?? [];
+    $qD = fn(string $expr, string $cond, string $in = '10') => (int)round((float)$db->query("SELECT COALESCE(SUM($expr),0) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE ms.year = 2026 AND ms.month IN ($in) AND ms.school_id = 3 AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) $cond")->fetchColumn());
+    $hC = renderPage('pages/reports.php', ['report' => 'cnss_summary', 'month' => 10, 'year' => 2026, 'schools' => [3]], ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $tC = $cellsD($hC); $lastC = $tC ? end($tC) : []; $restC = (int)preg_replace('/[^\d-]/', '', explode(' L.L', (string)end($lastC))[0] ?? '');
+    $cn = (int)preg_replace('/[^\d-]/', '', $rowD[2] ?? ''); $eo = (int)preg_replace('/[^\d-]/', '', $rowD[4] ?? ''); $tx = (int)preg_replace('/[^\d-]/', '', $rowD[6] ?? '');
+    $hE = renderPage('pages/reports.php', ['report' => 'eoc_summary', 'month' => 10, 'year' => 2026, 'schools' => [3]], ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $hT = renderPage('pages/reports.php', ['report' => 'tax_summary', 'month' => 10, 'year' => 2026, 'schools' => [3]], ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $eocParts = [$qD('ms.caisse_amount_lbp', " AND e.employee_type = 'enseignant_titulaire'"), $qD('ms.eoc_grade_lbp', " AND e.employee_type = 'enseignant_titulaire'"), $qD('ms.school_eoc_6_lbp', " AND e.employee_type = 'enseignant_titulaire'")];
+    $taxSum = $qD('ms.income_tax_lbp', ' AND e.tax_subject = 1');
+    $okSame = $cn > 0 && $cn === $restC && $eo === array_sum($eocParts) && $eo > 0 && $tx === $taxSum
+        && strpos($hE, $fmtD($eocParts[0])) !== false && strpos($hE, $fmtD($eocParts[2])) !== false && ($taxSum === 0 || strpos($hT, $fmtD($taxSum)) !== false);
+    $okShape = ($rowD[1] ?? '') !== '' && strpos($rowD[1], 'Hadath') !== false && count($rowD) === 10 && (int)preg_replace('/[^\d-]/', '', $rowD[8] ?? '') === $cn + $eo + $tx
+        && strpos($hD, 'المتوجّبات حسب المدرسة') !== false && stripos($hD, 'Fatal error') === false;
+    // (ب) فصل + نوعان فقط: عمودان لكل نوع + المجموع، والفصل = مجموع أشهره الثلاثة
+    $hQ = renderPage('pages/reports.php', ['report' => 'dues_summary', 'per' => 'quarter', 'q' => 4, 'year' => 2026, 'rate' => '90000', 'kinds_set' => 1, 'kinds' => ['eoc', 'tax'], 'schools' => [3]], ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $tQ = $cellsD($hQ); $rowQ = $tQ[1] ?? [];
+    $eoQ = $qD('ms.caisse_amount_lbp + ms.eoc_grade_lbp + ms.school_eoc_6_lbp', " AND e.employee_type = 'enseignant_titulaire'", '10,11,12');
+    $okQ = count($rowQ) === 8 && (int)preg_replace('/[^\d-]/', '', $rowQ[2] ?? '') === $eoQ && $eoQ > $eo && strpos($hQ, 'الضمان') === false || (count($rowQ) === 8 && (int)preg_replace('/[^\d-]/', '', $rowQ[2] ?? '') === $eoQ && $eoQ > $eo);
+    // (ج) نوع واحد ⇒ بلا عمود «المجموع»؛ ولا نوع ⇒ رسالة
+    $h1 = renderPage('pages/reports.php', ['report' => 'dues_summary', 'per' => 'month', 'month' => 10, 'year' => 2026, 'kinds_set' => 1, 'kinds' => ['cnss'], 'schools' => [3]], ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $h0 = renderPage('pages/reports.php', ['report' => 'dues_summary', 'per' => 'month', 'month' => 10, 'year' => 2026, 'kinds_set' => 1, 'schools' => [3]], ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $okPick = count($cellsD($h1)[1] ?? []) === 4 && strpos($h0, 'علِّم نوعاً واحداً على الأقلّ') !== false;
+    // (د) الإكسل + البلاطة + الفرنسي
+    $xD = $sheet184(renderPage('pages/reports_export.php', ['report' => 'dues_summary', 'per' => 'month', 'month' => 10, 'year' => 2026, 'rate' => '89500', 'format' => 'xlsx', 'schools' => [3]], ['extra', 'aide'], [3], 'lbp', '2026-2027', $PROJ . '/tools/_rdues.xlsx'));
+    $okXls = strpos($xD, 'المتوجّبات حسب المدرسة') !== false && strpos($xD, 'Hadath') !== false && strpos($xD, (string)$cn) !== false;
+    $okSrc = strpos((string)file_get_contents($PROJ . '/includes/report_center.php'), "'?report=dues_summary'") !== false
+        && strpos((string)file_get_contents($PROJ . '/assets/js/doclang.js'), "'المتوجّبات حسب المدرسة': 'Montants dus par école'") !== false
+        && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "'comp' => false]) ?>") !== false;
+    check('🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة (كملفّه SR GLADIS CNSS): شهر/فصل · ضمان/صندوق/مالية بالتشييك · سعر الدولار — والأرقام = الكشوف الشهرية الثلاثة (الضمان = الباقي المتوجب للصندوق) · شاشة + إكسل + بلاطة + فرنسي',
+        $okSame && $okShape && $okQ && $okPick && $okXls && $okSrc, 'same=' . (int)$okSame . ' shape=' . (int)$okShape . ' q=' . (int)$okQ . ' pick=' . (int)$okPick . ' xls=' . (int)$okXls . ' src=' . (int)$okSrc . " cnss=$cn rest=$restC eoc=$eo tax=$tx/$taxSum");
+} catch (Throwable $e) { check('🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة (كملفّه SR GLADIS CNSS)', false, $e->getMessage()); }
+
 /* ⏱️ قياس الوقت (اختياري: REG_TIMING=1) */
 if (getenv('REG_TIMING')) {
     $tl = "sec\trender_sec\trenders\tcheck\n";

@@ -166,6 +166,27 @@ if ($report === 'monthly_summary') {
     }
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('المجموع العام', $G, $rn); }
 
+} elseif ($report === 'dues_summary') {
+    // 🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة — نفس مصدر الشاشة (duesParams + duesRows)
+    $P = duesParams(); $dRows = duesRows($db, $P); $dK = $P['kinds']; $dLab = duesKinds(); $dMulti = count($dK) > 1;
+    $rep = new ReportTable('المتوجّبات حسب المدرسة — ' . $P['label']['ar'] . ' — 1 $ = ' . nfc($P['rate'], 2) . ' ل.ل', false);
+    $rep->schoolHeader($school);
+    $head = ['#', 'المدرسة']; foreach ($dK as $kk) { $head[] = $dLab[$kk] . ' (ل.ل)'; $head[] = $dLab[$kk] . ' ($)'; }
+    if ($dMulti) { $head[] = 'المجموع (ل.ل)'; $head[] = 'المجموع ($)'; }
+    $rep->head($head);
+    $dT = array_fill_keys($dK, 0); $dG = 0; $rn = 0;
+    foreach ($dRows as $r) {
+        $row = [++$rn, $r['fr'] . ' / ' . $r['ar']]; $rowT = 0;
+        foreach ($dK as $kk) { $v = (int)$r[$kk]; $dT[$kk] += $v; $rowT += $v; $row[] = $v ?: ''; $row[] = $v ? round($v / $P['rate'], 2) : ''; }
+        if ($dMulti) { $dG += $rowT; $row[] = $rowT ?: ''; $row[] = $rowT ? round($rowT / $P['rate'], 2) : ''; }
+        $rep->row($row);
+    }
+    if ($dRows && $dK) {
+        $row = ['', 'المجموع']; foreach ($dK as $kk) { $row[] = $dT[$kk]; $row[] = round($dT[$kk] / $P['rate'], 2); }
+        if ($dMulti) { $row[] = $dG; $row[] = round($dG / $P['rate'], 2); }
+        $rep->totalRow($row);
+    }
+
 } elseif ($report === 'tax_summary') {
     $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar, e.father_name_ar, e.father_name_fr,e.finance_ministry_number,e.school_id,e.social_status,e.spouse_works,e.payment_months_per_year,COALESCE(e.apply_family_deduction,1) afd,COALESCE(e.grant_spouse_addition,0) gsa,COALESCE(e.grant_children_addition,0) gca,e.id eid,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.income_tax_lbp,ms.taxable_base_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.prime_fixe_usd_law,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
