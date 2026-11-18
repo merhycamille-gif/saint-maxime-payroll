@@ -426,9 +426,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'email' => trim($_POST['email'] ?? ''),
         'diploma' => trim($_POST['diploma'] ?? ''),
         'specialization' => trim($_POST['specialization'] ?? ''),
-        'subjects_taught' => trim($_POST['subjects_taught'] ?? ''),
-        'niveau_scolaire' => is_array($_POST['niveau_scolaire'] ?? null) ? implode(',', $_POST['niveau_scolaire']) : '',
-        'classes_taught' => is_array($_POST['classes_taught'] ?? null) ? implode(',', array_map('intval', $_POST['classes_taught'])) : '',
+        // 🪪 (2026-11-18) خانات التعليم (الموادّ/المرحلة/الصفوف) للأستاذ فقط — تُفرَّغ للموظف غير المعلّم (كما تُفرَّغ الوظيفة للأستاذ)
+        'subjects_taught' => ($empType === 'employe') ? '' : trim($_POST['subjects_taught'] ?? ''),
+        'niveau_scolaire' => ($empType === 'employe') ? '' : (is_array($_POST['niveau_scolaire'] ?? null) ? implode(',', $_POST['niveau_scolaire']) : ''),
+        'classes_taught' => ($empType === 'employe') ? '' : (is_array($_POST['classes_taught'] ?? null) ? implode(',', array_map('intval', $_POST['classes_taught'])) : ''),
         // وظيفة الموظف الإداري: قيمة القائمة، أو النص الحر عند اختيار «أخرى». تُحفظ فقط للموظف الإداري، وتُفرَّغ للأستاذ.
         'job_title' => ($empType === 'employe')
             ? (($_POST['job_title'] ?? '') === '__other__' ? trim($_POST['job_title_other'] ?? '') : trim($_POST['job_title'] ?? ''))
@@ -436,7 +437,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'hire_date' => $_POST['hire_date'] ?: null,
         'display_hire_date' => ($_POST['display_hire_date'] ?? '') ?: null, // 🗓️👁️ صوري للعرض فقط (2026-09-26)
         // دخول الملاك = دخول المدرسة + سنتين تلقائياً إن تُرك فاضياً (القاعدة)؛ يمكن إدخاله يدوياً للتجاوز.
-        'titularization_date' => (($_POST['titularization_date'] ?? '') ?: (!empty($_POST['hire_date']) ? date('Y-m-d', strtotime($_POST['hire_date'] . ' +2 years')) : null)),
+        //   🪪 (2026-11-18) الموظف غير المعلّم لا ملاك له: لا يُحسب له تاريخ آلياً (المكتوب بيده فقط يُحفظ).
+        'titularization_date' => (($_POST['titularization_date'] ?? '') ?: (($empType !== 'employe' && !empty($_POST['hire_date'])) ? date('Y-m-d', strtotime($_POST['hire_date'] . ' +2 years')) : null)),
         'tenure_confirmation_date' => ($_POST['tenure_confirmation_date'] ?? '') ?: null,
         'starting_grade' => (float)($_POST['starting_grade'] ?? 1),
         'current_grade' => (float)($_POST['current_grade'] ?? 1),

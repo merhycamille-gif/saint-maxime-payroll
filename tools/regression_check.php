@@ -12067,6 +12067,35 @@ try {
 } catch (Throwable $e) { $ok314 = false; $why314 = $e->getMessage(); }
 check('🏛️½ (2026-11-16) نصف الأجر الإضافي بأوّل شهر الملاك: خيار بصفحة المدرسة (من سنة دراسية) + خيار بملف الأستاذ يغلب · مطفأ = كما كان بالحرف', $ok314, $why314);
 
+/* 🪪 (2026-11-18 بطاقة ماريا الحسيني — محاسبة على قانون العمل: «ما بقى فيي احمل أخطاء») الموظف غير المعلّم لا تُطبع له خانات الأستاذ */
+try {
+    $db = getDB();
+    $r1 = shownTitularizationDate(['id' => 0, 'employee_type' => 'employe', 'salary_labor_law' => 1, 'titularization_date' => '2028-10-01']) === '';
+    $r2 = shownTitularizationDate(['id' => 0, 'employee_type' => 'employe', 'salary_labor_law' => 0, 'eoc_subject' => 0, 'titularization_date' => '2028-10-01']) === '';
+    $r3 = shownTitularizationDate(['id' => 0, 'employee_type' => 'employe', 'salary_labor_law' => 0, 'eoc_subject' => 1, 'display_hire_date' => '', 'titularization_date' => '2010-10-01']) === '2010-10-01';   // موظف بالصندوق: تاريخه يبقى
+    $r4 = shownTitularizationDate(['id' => 0, 'employee_type' => 'enseignant_titulaire', 'eoc_subject' => 1, 'display_hire_date' => '', 'titularization_date' => '2010-10-01']) === '2010-10-01';
+    $srcE = (string)file_get_contents($PROJ . '/pages/employees.php'); $srcF = (string)file_get_contents($PROJ . '/pages/employee_fiche.php');
+    $save = strpos($srcE, "(\$empType !== 'employe' && !empty(\$_POST['hire_date']))") !== false && strpos($srcE, "'subjects_taught' => (\$empType === 'employe') ? ''") !== false;
+    $img = strpos($srcF, 'getimagesize(') !== false && strpos($srcF, 'style="width:<?= $photoW ?>mm;height:<?= $photoH ?>mm"') !== false;
+    $eRow = $db->query("SELECT id, school_id FROM employees WHERE is_deleted = 0 AND status = 'actif' AND employee_type = 'employe' AND COALESCE(eoc_subject,0) = 0 AND COALESCE(nssf_number,'') = '' AND birth_date IS NOT NULL ORDER BY salary_labor_law DESC, id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $tRow = $db->query("SELECT id, school_id FROM employees WHERE is_deleted = 0 AND status = 'actif' AND employee_type = 'enseignant_titulaire' AND COALESCE(subjects_taught,'') <> '' AND titularization_date IS NOT NULL ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $eOk = true; $tOk = true; $det = '';
+    if ($eRow) {
+        $h = renderPage('pages/employee_fiche.php', ['employee_id' => (string)$eRow['id'], 'lang_doc' => 'ar'], [], [(int)$eRow['school_id']]);
+        $h = substr($h, (int)strpos($h, 'id="ppExportArea"'));
+        $bad = []; foreach (['تاريخ الملاك:', 'الدرجة:', 'المواد:', 'الصفوف:', 'المرحلة:', 'رقم الضمان:', 'التدرّج'] as $k) if (strpos($h, $k) !== false) $bad[] = $k;
+        $eOk = !$bad && strpos($h, 'بطاقة الموظف') !== false; $det .= 'موظف #' . $eRow['id'] . ($bad ? ' ✗ ' . implode(' ', $bad) : ' ✓');
+    }
+    if ($tRow) {
+        $h = renderPage('pages/employee_fiche.php', ['employee_id' => (string)$tRow['id'], 'lang_doc' => 'ar'], [], [(int)$tRow['school_id']]);
+        $h = substr($h, (int)strpos($h, 'id="ppExportArea"'));
+        $miss = []; foreach (['تاريخ الملاك:', 'الدرجة:', 'المواد:'] as $k) if (strpos($h, $k) === false) $miss[] = $k;
+        $tOk = !$miss; $det .= ' · أستاذ #' . $tRow['id'] . ($miss ? ' ✗ ناقص ' . implode(' ', $miss) : ' ✓');
+    }
+    check('🪪 (2026-11-18) بطاقة الموظف غير المعلّم: بلا ملاك/درجة/موادّ/صفوف/«التدرّج»، رقم ضمان فارغ لا يطبع سنة الولادة، الصورة بقياسها، والحفظ لا يحسب له ملاكاً — وبطاقة الأستاذ كما هي',
+        $r1 && $r2 && $r3 && $r4 && $save && $img && $eOk && $tOk, 'rule=' . (int)($r1 && $r2 && $r3 && $r4) . ' save=' . (int)$save . ' img=' . (int)$img . ' · ' . $det);
+} catch (Throwable $e) { check('🪪 (2026-11-18) بطاقة الموظف غير المعلّم', false, $e->getMessage()); }
+
 /* ⏱️ قياس الوقت (اختياري: REG_TIMING=1) */
 if (getenv('REG_TIMING')) {
     $tl = "sec\trender_sec\trenders\tcheck\n";

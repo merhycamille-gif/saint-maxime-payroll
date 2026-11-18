@@ -10254,7 +10254,11 @@ function shownHireDate($e): string {
 }
 /** تاريخ الملاك كما يُعرض: مع الصوري = الصوري + سنتان (للأساتذة)، وإلا الحقيقي */
 function shownTitularizationDate($e): string {
-    $a = (array)$e; $d = displayHireDateOf($a);
+    $a = (array)$e;
+    // 🪪 (2026-11-18 بطاقة ماريا الحسيني — محاسبة على قانون العمل طُبع لها «تاريخ الملاك 01/10/2028») الموظف غير المعلّم الذي ليس بالصندوق
+    //    (أو على قانون العمل) لا ملاك له: التاريخ المخزَّن عنده محسوب آلياً (الدخول + سنتان) عند الحفظ ولا يُعرَض بأي ورقة.
+    if (($a['employee_type'] ?? '') === 'employe' && ((int)($a['salary_labor_law'] ?? 0) === 1 || (array_key_exists('eoc_subject', $a) && (int)$a['eoc_subject'] === 0))) return '';
+    $d = displayHireDateOf($a);
     if ($d !== '') return (($a['employee_type'] ?? '') === 'employe') ? '' : date('Y-m-d', strtotime($d . ' +2 years'));
     $t = (string)($a['titularization_date'] ?? ''); return ($t !== '' && $t !== '0000-00-00' && $t >= '1900-01-01') ? substr($t, 0, 10) : '';
 }

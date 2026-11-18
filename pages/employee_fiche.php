@@ -329,14 +329,18 @@ if (($emp['salary_input_mode'] ?? '') === 'direct_lbp' && (float)($emp['contract
 $transport = ((float)($emp['transport_daily_amount'] ?? 0) > 0)
     ? ($num($emp['transport_daily_amount']) . ' ' . ($emp['transport_daily_currency'] ?? 'LBP') . ' × ' . (int)($emp['transport_days_per_week'] ?? 0) . ' ' . $t('day') . ' × ' . $num($emp['transport_weeks'] ?? 0) . ' ' . $t('week'))
     : '';
-$incShort = fn($ech, $ext, $pa) => implode('، ', array_filter([(int)$ech ? $t('ech') : '', (int)$ext ? $t('extra') : '', (int)$pa ? $t('aide') : ''])) ?: $t('base_only');
-if (!$rtl) $incShort = fn($ech, $ext, $pa) => implode(', ', array_filter([(int)$ech ? $t('ech') : '', (int)$ext ? $t('extra') : '', (int)$pa ? $t('aide') : ''])) ?: $t('base_only');
+// 🪪 (2026-11-18) «التدرّج» للأستاذ فقط: الموظف غير المعلّم لا درجات له فلا تُذكر بسطور الضريبة/الضمان/الصندوق
+$incShort = fn($ech, $ext, $pa) => implode($rtl ? '، ' : ', ', array_filter([((int)$ech && $isTeacher) ? $t('ech') : '', (int)$ext ? $t('extra') : '', (int)$pa ? $t('aide') : ''])) ?: $t('base_only');
 $subj = fn($on, $ech, $ext, $pa) => (int)$on ? ($t('yes') . ': ' . $incShort($ech, $ext, $pa)) : $t('no');
 $m13 = (int)($emp['has_13th_month'] ?? 0)
     ? ($t('yes') . ((($emp['m13_include_extra'] ?? 0) || ($emp['m13_include_aide'] ?? 0)) ? ' — ' . $t('incl') . ': ' . implode($rtl ? '، ' : ', ', array_filter([($emp['m13_include_extra'] ?? 0) ? $t('extra') : '', ($emp['m13_include_aide'] ?? 0) ? $t('aide') : ''])) : ''))
     : $t('no');
-$grade = trim((string)gradeDisplay($emp));
-if ((float)($emp['starting_grade'] ?? 0) > 0) $grade .= ($grade !== '' ? ' ' : '') . '(' . $t('grade0') . ' ' . $num($emp['starting_grade']) . ')';
+// 🪪 (2026-11-18) الدرجة للأستاذ فقط (كانت تطبع للموظف «— (الابتدائية 1)»)
+$grade = '';
+if ($isTeacher) {
+    $grade = trim((string)gradeDisplay($emp));
+    if ((float)($emp['starting_grade'] ?? 0) > 0) $grade .= ($grade !== '' ? ' ' : '') . '(' . $t('grade0') . ' ' . $num($emp['starting_grade']) . ')';
+}
 $hours = implode(' · ', array_filter([
     (float)($emp['hours_per_week'] ?? 0) > 0 ? ($num($emp['hours_per_week']) . ' ' . $t('h_wk')) : '',
     (int)($emp['days_per_week'] ?? 0) > 0 ? ((int)$emp['days_per_week'] . ' ' . $t('d_wk')) : '',
@@ -390,19 +394,19 @@ $S['s_job'] = [
     [$t('job'), (!$isTeacher && ($emp['job_title'] ?? '') !== '') ? jobTitleLabel($emp['job_title'], $vl) : ''],
     [$t('dipl'), ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma'], $vl) : ''],
     [$t('spec'), $specLbl],
-    [$t('subj'), $subjLbl],
-    [$t('cycle'), $cycleLbl],
-    [$t('classes'), $classes],
+    [$t('subj'), $isTeacher ? $subjLbl : ''],       // 🪪 (2026-11-18) خانات التعليم للأستاذ فقط
+    [$t('cycle'), $isTeacher ? $cycleLbl : ''],
+    [$t('classes'), $isTeacher ? $classes : ''],
     [$t('grade'), $grade],
     [$t('hours'), $hours],
     [$t('entry'), shownHireDate($emp) ? formatDate(shownHireDate($emp)) : ''],
     [$t('titul'), shownTitularizationDate($emp) ? formatDate(shownTitularizationDate($emp)) : ''],
-    [$t('confirm'), $emp['tenure_confirmation_date'] ? formatDate($emp['tenure_confirmation_date']) : ''],
+    [$t('confirm'), ($emp['tenure_confirmation_date'] && shownTitularizationDate($emp) !== '') ? formatDate($emp['tenure_confirmation_date']) : ''],
     [$t('status'), $statusLbl],
     [$t('after64'), (int)($emp['keep_working_past_64'] ?? 0) === 1 ? $t('yes') : ''],
 ];
 $S['s_off'] = [
-    [$t('cnss'), cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', '')],
+    [$t('cnss'), trim((string)($emp['nssf_number'] ?? '')) !== '' ? cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '') : ''],   // 🪪 (2026-11-18) بلا رقم ضمان = السطر لا يُطبع (كان يطبع سنة الولادة وحدها «2002» كأنّها الرقم)
     [$t('mof'), $emp['finance_ministry_number'] ?? ''],
     [$t('eoc'), $emp['caisse_number'] ?? ''],
     [$t('left_all'), !empty($emp['left_date_all']) ? formatDate($emp['left_date_all']) : ''],
@@ -427,6 +431,13 @@ $photoUrl = '';
 if (!empty($emp['photo_path']) && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', (string)$emp['photo_path']) && is_file(__DIR__ . '/../' . $emp['photo_path'])) {
     $photoUrl = BASE_URL . e($emp['photo_path']);
 }
+// 🪪 (2026-11-18 بطاقة ماريا الحسيني: الصورة طُبعت بنصف الورقة) القياس يُكتب على الصورة نفسها (محرّك الطباعة لا يقرأ قياس الـCSS):
+//    تُحصَر داخل إطار 26×32 ملم مع حفظ نسبتها — صورة عريضة (هوية مرفوعة محلّ الصورة) تصغر ولا تتمدّد ولا تأكل الورقة.
+$photoW = 26.0; $photoH = 32.0;
+if ($photoUrl) {
+    $gi = @getimagesize(__DIR__ . '/../' . $emp['photo_path']);
+    if ($gi && $gi[0] > 0 && $gi[1] > 0) { $k = min(26.0 / $gi[0], 32.0 / $gi[1]); $photoW = round($gi[0] * $k, 1); $photoH = round($gi[1] * $k, 1); }
+}
 $notes = trim((string)($emp['notes'] ?? ''));
 if (mb_strlen($notes) > 320) $notes = mb_substr($notes, 0, 320) . '…';   // الملاحظات الطويلة تبقى كاملة بالملف — هنا سطران كي تبقى الورقة واحدة
 
@@ -442,7 +453,7 @@ echo officialFormStyles();
 .fiche-a4 .fiche-top td{border:0;padding:0;vertical-align:middle}
 .fiche-a4 .fiche-photo{width:30mm;text-align:left}
 .fiche-a4.ltr .fiche-photo{text-align:right}
-.fiche-a4 .fiche-photo img{width:26mm;height:32mm;object-fit:cover;border:1px solid #cbd5e1;border-radius:4px}
+.fiche-a4 .fiche-photo img{border:1px solid #cbd5e1;border-radius:4px}
 .fiche-a4 .doc-title{margin:4px 0 2px;font-size:18pt}
 .fiche-a4 .doc-subtitle{margin:0 0 4px}
 .fiche-a4 table.pdf-info{width:100%;border-collapse:collapse;margin:2px 0 6px;font-size:12pt}
@@ -499,19 +510,19 @@ $langUrl = fn($k) => BASE_URL . 'pages/employee_fiche.php?employee_id=' . $emplo
         <?php /* 🌐 (2026-10-24) كبسات اللغة انتقلت لشريط التصدير (doc_langs) */ ?>
     </div>
     <?php if (viewerCanSeePage('employees.php')): ?>
-    <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $employeeId ?>" class="btn btn-light"><i class="fas fa-user-pen"></i> Modifier le dossier / تعديل ملف الأستاذ</a>
+    <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $employeeId ?>" class="btn btn-light"><i class="fas fa-user-pen"></i> Modifier le dossier / <?= $isTeacher ? 'تعديل ملف الأستاذ' : 'تعديل ملف الموظف' ?></a>
     <?php endif; ?>
 </div>
 
 <div id="ppExportArea">
 <div class="official-doc <?= $rtl ? 'rtl' : 'ltr' ?> fiche-a4 <?= $rtl ? '' : 'ltr' ?>" dir="<?= $dirAttr ?>">
     <div style="line-height:1.25"><?= schoolLetterhead($school) ?></div>
-    <table class="fiche-top" dir="<?= $dirAttr ?>"><tr>
-        <td>
+    <table class="fiche-top" dir="<?= $dirAttr ?>" width="100%" style="width:100%;border-collapse:collapse"><tr>
+        <td style="border:0;vertical-align:middle">
             <div class="doc-title" style="line-height:1.2;margin:0 0 1pt"><?= e($titleDoc) ?></div>
-            <div class="doc-subtitle" style="margin:0 0 2pt;line-height:1.2"><strong><?= e($rtl ? ($nameAr ?: $nameFr) : ($nameFr ?: $nameAr)) ?></strong><?php if ($nameAr && $nameFr): ?> — <span dir="<?= $rtl ? 'ltr' : 'rtl' ?>"><?= e($rtl ? $nameFr : $nameAr) ?></span><?php endif; ?><?php if (!empty($emp['employee_code'])): ?> · <?= e($emp['employee_code']) ?><?php endif; ?></div>
+            <div class="doc-subtitle" style="margin:0 0 2pt;line-height:1.2"><strong style="white-space:nowrap"><?= e($rtl ? ($nameAr ?: $nameFr) : ($nameFr ?: $nameAr)) ?></strong><?php if ($nameAr && $nameFr): ?> — <span dir="<?= $rtl ? 'ltr' : 'rtl' ?>" style="white-space:nowrap;unicode-bidi:isolate"><?= e($rtl ? $nameFr : $nameAr) ?></span><?php endif; ?><?php if (!empty($emp['employee_code'])): ?> · <span dir="ltr" style="white-space:nowrap;unicode-bidi:isolate"><?= e($emp['employee_code']) ?></span><?php endif; ?></div>
         </td>
-        <?php if ($photoUrl): ?><td class="fiche-photo"><img src="<?= $photoUrl ?>" alt=""></td><?php endif; ?>
+        <?php if ($photoUrl): ?><td class="fiche-photo" width="<?= round(($photoW + 4) * 3.78) ?>" style="width:<?= $photoW + 4 ?>mm"><img src="<?= $photoUrl ?>" alt="" width="<?= round($photoW * 3.78) ?>" height="<?= round($photoH * 3.78) ?>" style="width:<?= $photoW ?>mm;height:<?= $photoH ?>mm"></td><?php endif; ?>
     </tr></table>
 
     <?php foreach ($S as $sk => $rows): ?>
