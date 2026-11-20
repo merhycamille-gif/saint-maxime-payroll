@@ -9934,9 +9934,9 @@ check('🚪🩹 التاركون العشرون (الـ19 + حنان تحومي 
  * =================================================================== */
 $ex243 = (string)file_get_contents($PROJ . '/assets/js/export.js');
 check('📲 كبسة واتساب تبعت الـPDF دغري (مشاركة الملف مباشرةً — النافذة القديمة احتياط للمتصفّح الذي لا يشارك ملفات)',
-      strpos($ex243, 'function waSendPdf(title, getPdf, fallback)') !== false && strpos($ex243, 'navigator.share({ files: [file], title: title })') !== false
-      && strpos($ex243, 'if (!canSharePdf()) { fallback(); return; }') !== false && strpos($ex243, 'function () { ppWhatsAppManual(title, phone); }') !== false
-      && strpos($ex243, '}, offWaManual);') !== false);
+      strpos($ex243, 'function waSendPdf(title, getPdf, fallback, phone)') !== false && strpos($ex243, 'function waShareOld(title, getPdf, fallback)') !== false &&   /* 2026-11-20: الإرسال المباشر أوّلاً؛ المشاركة القديمة = waShareOld */ strpos($ex243, 'navigator.share({ files: [file], title: title })') !== false
+      && strpos($ex243, 'if (!canSharePdf()) { fallback(); return; }') !== false && strpos($ex243, 'function () { ppWhatsAppManual(title, phone); }, phone);') !== false
+      && strpos($ex243, '}, offWaManual, o.phone);') !== false);
 
 /* =====================================================================
  * 244) 📲✉️ (2026-10-03 «ماف واتس اب ولا ايميل هون ليش» — p11 البطاقة السنوية): سطر التصدير بالبطاقة (المفردة والجماعية)
@@ -12221,6 +12221,29 @@ try {
     check('🗓️🏫 (2026-11-20) المتوجّبات: الضمان حسب المؤسّسة (كسارة/مكسيموس عبرا/العلاج الفيزيائي فصلي والباقي شهري — schools.cnss_quarterly) · فصل صندوق التعويضات على السنة المدرسية (ف1 = ت1–ك1) والمالية/الضمان ميلادية · أوّل فتحة فصلي',
         $okCol && $okAuto && $okSy && $okFirst && $okAx && $okSrcQ, 'col=' . (int)$okCol . ' auto=' . (int)$okAuto . ' sy=' . (int)$okSy . ' first=' . (int)$okFirst . ' xls=' . (int)$okAx . ' src=' . (int)$okSrcQ . ' r3=' . json_encode($r3, JSON_UNESCAPED_UNICODE) . ' r11=' . json_encode($r11, JSON_UNESCAPED_UNICODE));
 } catch (Throwable $e) { check('🗓️🏫 (2026-11-20) المتوجّبات: الضمان حسب المؤسّسة + فصل الصندوق على السنة المدرسية', false, $e->getMessage()); }
+/* 📲 (2026-11-20 «أنا ما فيي أبعت واتس دغري من هالبرنامج» ⇒ «فينا نبقى نبعت من الرقم اللي بالأقساط» ⇒ «أكيد بدّي ياها… الرسمي والأفضل والأسهل، ويكون في خيار أنا أختار الرقم»)
+ *    الإرسال المباشر بالواتساب: includes/wa_cloud.php (WhatsApp Cloud API، قالب msa_payroll_document برأس مستند، توقيع MSA Payroll) + pages/send_whatsapp.php
+ *    (CSRF + canEdit + قالب معتمَد + سجلّ الإرسال via=whatsapp) + نافذة اختيار الرقم (للأستاذ/للمدرسة/رقم آخر) بـexport.js — حسابات القراءة تبقى على الطريقة اليدوية. */
+try {
+    require_once $PROJ . '/includes/wa_cloud.php';
+    $okPh = msaWaPhone('03 123 456') === '9613123456' && msaWaPhone('+961 70 111 222') === '96170111222' && msaWaPhone('70111222') === '96170111222' && msaWaPhone('0033612345678') === '33612345678'
+        && msaWaPhone('12') === '' && msaWaPhone('abc') === '' && msaWaPretty('9613115110') === '+961 3 115 110'
+        && msaWaIsMobile('03 115 110') && msaWaIsMobile('76 137 895') && msaWaIsMobile('81-324528') && !msaWaIsMobile('04-871097') && !msaWaIsMobile('01 234 567');
+    $plW = msaWaDocPayload('9613123456', 'MEDIA1', 'releve.pdf', "Relevé annuel\n2026-2027   —  Test");
+    $okPl = $plW['type'] === 'template' && $plW['to'] === '9613123456' && ($plW['template']['components'][0]['parameters'][0]['document']['id'] ?? '') === 'MEDIA1'
+        && ($plW['template']['components'][0]['parameters'][0]['document']['filename'] ?? '') === 'releve.pdf'
+        && ($plW['template']['components'][1]['parameters'][0]['text'] ?? '') === 'Relevé annuel 2026-2027 — Test' && msaWaParam('') === 'Document' && mb_strlen(msaWaParam(str_repeat('ا', 500))) === 180;
+    $swS = (string)file_get_contents($PROJ . '/pages/send_whatsapp.php'); $exS = (string)file_get_contents($PROJ . '/assets/js/export.js'); $ftS = (string)file_get_contents($PROJ . '/includes/footer.php');
+    $okSrcW = strpos($swS, "if (!verifyCsrf(\$_POST['csrf'] ?? ''))") !== false && strpos($swS, "if (!canEdit()) \$out(false, 'غير مسموح — حساب قراءة فقط');") !== false
+        && strpos($swS, "if (\$st !== 'APPROVED')") !== false && strpos($swS, "'whatsapp', \$r['ok'] ? mb_substr(\$r['id'], 0, 80) : null, \$r['ok'] ? 'wa_sent' : 'failed'") !== false
+        && strpos($exS, "if (window.MSA_WA_DIRECT) { waDirect(title, getPdf, function () { waShareOld(title, getPdf, fallback); }, phone); return; }") !== false
+        && strpos($exS, 'name="msaWaRecip" value="other"') !== false && strpos($exS, "'pages/send_whatsapp.php'") !== false
+        && strpos($ftS, 'canEdit() && msaWaEnabled()') !== false && strpos($ftS, 'window.MSA_WA_DIRECT') !== false
+        && msaMailStatusLabel('wa_sent')[0] !== 'wa_sent' && preg_match('/_at$/', 'wa_cloud_tpl_checked_at') === 1;
+    check('📲 (2026-11-20) الواتساب المباشر: تنسيق الأرقام (خلوي فقط يُقترَح) + جسم طلب القالب (مستند + اسم المستند بسطر واحد) + الحماية (CSRF، لا حسابات قراءة، قالب معتمَد) + السجلّ + نافذة اختيار الرقم',
+        $okPh && $okPl && $okSrcW, 'phone=' . (int)$okPh . ' payload=' . (int)$okPl . ' src=' . (int)$okSrcW);
+} catch (Throwable $e) { check('📲 (2026-11-20) الواتساب المباشر', false, $e->getMessage()); }
+
 
 
 

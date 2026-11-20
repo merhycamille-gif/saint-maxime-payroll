@@ -51,6 +51,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
     }
     // 🌐 (2026-10-15 «ركّبه») محرّك الطباعة الاحترافي (Chromium على سيرفر المدرسة): كلمة سرّ الخدمة تُحفَظ هنا لا بالكود
+    // 📲 (2026-11-20) الواتساب المباشر (WhatsApp Cloud API — رقم المؤسّسة): المفتاح والمعرّفات تُحفَظ هنا لا بالكود
+    // 🏛️ (2026-11-20) جهة اتّصال الرئاسة العامة (الاسم + واتساب + إيميل) — تظهر خياراً جاهزاً بنافذتَي الإرسال
+    if (isset($_POST['save_hq_contact'])) {
+        setSetting('hq_contact_name', mb_substr(trim((string)($_POST['hq_contact_name'] ?? '')), 0, 120));
+        setSetting('hq_contact_whatsapp', mb_substr(trim((string)($_POST['hq_contact_whatsapp'] ?? '')), 0, 30));
+        $hqE = trim((string)($_POST['hq_contact_email'] ?? '')); setSetting('hq_contact_email', ($hqE === '' || filter_var($hqE, FILTER_VALIDATE_EMAIL)) ? $hqE : (string)getSetting('hq_contact_email', ''));
+        $_SESSION[($hqE === '' || filter_var($hqE, FILTER_VALIDATE_EMAIL)) ? 'flash_success' : 'flash_error'] = ($hqE === '' || filter_var($hqE, FILTER_VALIDATE_EMAIL)) ? 'تم حفظ جهة اتّصال الرئاسة العامة' : 'الإيميل غير صحيح — لم يتغيّر (الاسم والرقم حُفظا)';
+        header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
+    }
+    if (isset($_POST['save_wa_cloud'])) {
+        $wt = trim((string)($_POST['wa_cloud_token'] ?? '')); if ($wt !== '') setSetting('wa_cloud_token', $wt);
+        foreach (['wa_cloud_phone_id', 'wa_cloud_waba_id'] as $wk) { $wv = preg_replace('/\D/', '', (string)($_POST[$wk] ?? '')); if ($wv !== '') setSetting($wk, $wv); }
+        setSetting('wa_cloud_from', mb_substr(trim((string)($_POST['wa_cloud_from'] ?? '')), 0, 30));
+        setSetting('wa_cloud_disabled', !empty($_POST['wa_cloud_disabled']) ? '1' : '');
+        setSetting('wa_cloud_tpl_checked_at', '');
+        $_SESSION['flash_success'] = 'تم حفظ إعدادات الواتساب المباشر';
+        header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
+    }
     if (isset($_POST['save_pdf_engine'])) {
         $pp = (string)($_POST['pdf_service_pass'] ?? '');
         if ($pp !== '') setSetting('pdf_service_pass', $pp);
@@ -89,6 +107,53 @@ $secure = getSetting('smtp_secure', '');
 $fromName = getSetting('smtp_from_name', '');
 include __DIR__ . '/../includes/header.php';
 ?>
+<?php // 🏛️ (2026-11-20 «رقم الرئاسة العامة… يكون عندي الاسم ورقمو محفوظين») جهة اتّصال الرئاسة العامة
+    $hqN = (string)getSetting('hq_contact_name', ''); $hqW = (string)getSetting('hq_contact_whatsapp', ''); $hqM = (string)getSetting('hq_contact_email', ''); ?>
+<div class="card" style="max-width:680px;border:1px solid #c7d2fe">
+    <div class="card-header" style="background:#eef2ff"><h3>
+        <span dir="ltr"><i class="fas fa-landmark"></i> Supérieure Générale — contact</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">الرئاسة العامة — الاسم والرقم والإيميل المحفوظة للإرسال</div>
+    </h3></div>
+    <div class="card-body">
+        <div class="alert alert-info" style="line-height:1.9">بنافذة الواتساب وبنافذة الإيميل بيطلع خيار «🏛️ <?= e($hqN !== '' ? $hqN : 'الرئاسة العامة') ?>» جاهز — كبسة وحدة بتعبّي الرقم أو الإيميل.</div>
+        <form method="post" class="lockedit">
+            <?= csrfField() ?>
+            <div class="form-row cols-2">
+                <div class="form-group"><label class="form-label">Nom / الاسم</label><input type="text" name="hq_contact_name" class="form-control" value="<?= e($hqN) ?>" placeholder="الرئاسة العامة"></div>
+                <div class="form-group"><label class="form-label">WhatsApp / رقم الواتساب</label><input type="tel" name="hq_contact_whatsapp" class="form-control" dir="ltr" value="<?= e($hqW) ?>" placeholder="03 123 456"></div>
+                <div class="form-group"><label class="form-label">E-mail / الإيميل</label><input type="email" name="hq_contact_email" class="form-control" dir="ltr" value="<?= e($hqM) ?>" placeholder="name@example.com"></div>
+            </div>
+            <button class="btn btn-primary" name="save_hq_contact" value="1"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
+        </form>
+    </div>
+</div>
+<?php // 📲 (2026-11-20) الواتساب المباشر — نفس رقم المؤسّسة المستعمل ببرنامج الأقساط (WhatsApp Cloud API)
+    require_once __DIR__ . '/../includes/wa_cloud.php';
+    $waC = msaWaCfg(); $waOn = msaWaEnabled(); $waTpl = $waOn ? msaWaTemplateStatus() : '';
+    $waTplLbl = ['APPROVED' => 'معتمَد ✓', 'PENDING' => 'قيد المراجعة عند واتساب ⏳', 'REJECTED' => 'مرفوض ✕', '' => 'غير معروف'][$waTpl] ?? $waTpl; ?>
+<div class="card" style="max-width:680px;border:1px solid #bbf7d0">
+    <div class="card-header" style="background:#f0fdf4"><h3>
+        <span dir="ltr"><i class="fab fa-whatsapp"></i> WhatsApp direct</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">الواتساب المباشر (إرسال المستندات من رقم المؤسّسة)</div>
+    </h3></div>
+    <div class="card-body">
+        <div class="alert <?= ($waOn && $waTpl === 'APPROVED') ? 'alert-success' : 'alert-warning' ?>" style="line-height:1.9">
+            الحالة: <strong><?= $waC['disabled'] ? 'معطَّل (كبسة واتساب ترجع للطريقة اليدوية)' : ($waOn ? ('مربوط ✓ — الرقم ' . e($waC['from'] ?: '—')) : 'غير مربوط — يلزم المفتاح ومعرّف الرقم') ?></strong><?php if ($waOn): ?> · قالب الرسالة «<span dir="ltr"><?= e($waC['tpl']) ?></span>»: <strong><?= e($waTplLbl) ?></strong><?php endif; ?><br>
+            كبسة WhatsApp بكل مستند بتسأل عن الرقم وبتبعت الملف PDF دغري برسالة رسمية موقَّعة «MSA Payroll»، وكل إرسال بيتسجّل بسجلّ الإرسال. لحسابات القراءة تبقى الطريقة اليدوية.
+        </div>
+        <form method="post" class="lockedit">
+            <?= csrfField() ?>
+            <div class="form-row cols-2">
+                <div class="form-group"><label class="form-label">Jeton d'accès / مفتاح الربط <?= $waC['token'] !== '' ? '(محفوظ — اتركه فارغاً ليبقى)' : '' ?></label><input type="password" name="wa_cloud_token" class="form-control" dir="ltr" autocomplete="new-password"></div>
+                <div class="form-group"><label class="form-label">Numéro affiché / الرقم الظاهر</label><input type="text" name="wa_cloud_from" class="form-control" dir="ltr" value="<?= e($waC['from']) ?>" placeholder="03 115 110"></div>
+                <div class="form-group"><label class="form-label">Phone number ID</label><input type="text" name="wa_cloud_phone_id" class="form-control" dir="ltr" value="<?= e($waC['phone_id']) ?>"></div>
+                <div class="form-group"><label class="form-label">WABA ID</label><input type="text" name="wa_cloud_waba_id" class="form-control" dir="ltr" value="<?= e($waC['waba_id']) ?>"></div>
+                <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="wa_cloud_disabled" value="1" <?= $waC['disabled'] ? 'checked' : '' ?>> Désactiver / تعطيل مؤقّت (ارجع للطريقة اليدوية)</label></div>
+            </div>
+            <button class="btn btn-primary" name="save_wa_cloud" value="1"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
+        </form>
+    </div>
+</div>
 <?php // 🌐 (2026-10-15) محرّك الطباعة الاحترافي — Chromium على سيرفر المدرسة (collegesaintmaxime.com/pdf)
     $pdfPassSet = (string)getSetting('pdf_service_pass', '') !== ''; $pdfOff = (string)getSetting('pdf_service_disabled', '') === '1';
     $pdfHealth = null; try { $chH = curl_init('https://collegesaintmaxime.com/pdf/health'); curl_setopt_array($chH, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 5, CURLOPT_CONNECTTIMEOUT => 4]); curl_exec($chH); $pdfHealth = (int)curl_getinfo($chH, CURLINFO_HTTP_CODE); curl_close($chH); } catch (Throwable $e) {} ?>

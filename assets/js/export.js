@@ -485,6 +485,7 @@
         if (sch) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="school" data-mail="' + escH(sch) + '"' + (def === 'school' ? ' checked' : '') + '> 🏫 <b>للمدرسة</b> ' + escH(window.MSA_SCHOOL_NAME || '') + ' <span dir="ltr" style="color:#64748b">‹' + escH(sch) + '›</span></label>';
         if (tch) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="teacher" data-mail="' + escH(tch) + '"' + (def === 'teacher' ? ' checked' : '') + '> 👨‍🏫 <b>للأستاذ</b> ' + escH(window.MSA_TEACHER_NAME || '') + ' <span dir="ltr" style="color:#64748b">‹' + escH(tch) + '›</span></label>';
         else if (window.MSA_TEACHER_NAME) h += '<div style="color:#92400e;font-size:12.5px">👨‍🏫 الأستاذ ' + escH(window.MSA_TEACHER_NAME) + ' ما إله إيميل بملفه — اكتبه بملفه (تبويب العنوان) ليظهر هون.</div>';
+        if (window.MSA_HQ_EMAIL) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="hq" data-mail="' + escH(window.MSA_HQ_EMAIL) + '"> 🏛️ <b>' + escH(window.MSA_HQ_NAME || 'الرئاسة العامة') + '</b> <span dir="ltr" style="color:#64748b">' + escH(window.MSA_HQ_EMAIL) + '</span></label>';   // 🏛️ (2026-11-20)
         h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="other"' + (def === 'other' ? ' checked' : '') + '> ✍️ <b>إيميل آخر</b></label></div>';
         h += '<input type="email" id="' + inputId + '" class="form-control" dir="ltr" value="' + escH(val) + '" placeholder="name@example.com" style="margin-bottom:8px">';
         return h;
@@ -550,7 +551,69 @@
                 && navigator.canShare({ files: [new File([new Blob(['%PDF-'], { type: 'application/pdf' })], 'a.pdf', { type: 'application/pdf' })] }));
         } catch (e) { return false; }
     }
-    function waSendPdf(title, getPdf, fallback) {
+    // 📲 (2026-11-20 «أنا ما فيي أبعت واتس دغري من هالبرنامج… ويكون في خيار أنا أختار الرقم اللي بدّي أبعتله») الإرسال المباشر من رقم المؤسّسة:
+    //    نافذة فيها الرقم (للمدرسة / للأستاذ / رقم آخر — معبّأ لحاله حين يُعرَف) ⇒ «أرسل» ⇒ الملف يروح دغري (pages/send_whatsapp.php) ويُسجَّل بسجلّ الإرسال.
+    //    لحسابات القراءة أو حين لا يكون الربط مفعَّلاً (window.MSA_WA_DIRECT فارغ) تبقى الطريقة القديمة (مشاركة من الجهاز / تنزيل + فتح المحادثة).
+    function waRecipHtml(phone) {
+        var sch = window.MSA_SCHOOL_WA || '', tch = window.MSA_TEACHER_WA || '', given = (phone || '').trim();
+        var def = tch ? 'teacher' : (given ? 'other' : (sch ? 'school' : 'other'));
+        var val = def === 'teacher' ? tch : (def === 'school' ? sch : given);
+        var h = '<div class="msaRecip" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;font-size:14px">';
+        if (tch) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaWaRecip" value="teacher" data-num="' + escH(tch) + '"' + (def === 'teacher' ? ' checked' : '') + '> 👨‍🏫 <b>للأستاذ</b> ' + escH(window.MSA_TEACHER_NAME || '') + ' <span dir="ltr" style="color:#64748b">' + escH(tch) + '</span></label>';
+        else if (window.MSA_TEACHER_NAME) h += '<div style="color:#92400e;font-size:12.5px">👨‍🏫 الأستاذ ' + escH(window.MSA_TEACHER_NAME) + ' ما إله رقم خلوي بملفه — اكتب الرقم هون، أو زيده بملفه ليظهر لحاله.</div>';
+        if (sch) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaWaRecip" value="school" data-num="' + escH(sch) + '"' + (def === 'school' ? ' checked' : '') + '> 🏫 <b>للمدرسة</b> ' + escH(window.MSA_SCHOOL_NAME || '') + ' <span dir="ltr" style="color:#64748b">' + escH(sch) + '</span></label>';
+        if (window.MSA_HQ_WA) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaWaRecip" value="hq" data-num="' + escH(window.MSA_HQ_WA) + '"> 🏛️ <b>' + escH(window.MSA_HQ_NAME || 'الرئاسة العامة') + '</b> <span dir="ltr" style="color:#64748b">' + escH(window.MSA_HQ_WA) + '</span></label>';   // 🏛️ (2026-11-20) الرئاسة العامة محفوظة بالإعدادات
+        h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaWaRecip" value="other"' + (def === 'other' ? ' checked' : '') + '> ✍️ <b>رقم آخر / Autre numéro</b></label></div>';
+        h += '<input type="tel" id="ppWaTo" class="form-control" dir="ltr" value="' + escH(val) + '" placeholder="03 123 456 أو +961 70 123 456" style="margin-bottom:8px;font-size:16px;font-weight:700">';
+        return h;
+    }
+    function waDirect(title, getPdf, fallback, phone) {
+        var m = shareModal(
+            '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:6px"><i class="fab fa-whatsapp"></i> إرسال بالواتساب مباشرة / Envoyer par WhatsApp</div>'
+            + '<div style="font-size:13px;color:#475569;margin-bottom:10px">الملف PDF بيروح مرفق برسالة رسمية من الرقم <b dir="ltr">' + escH(window.MSA_WA_FROM || '') + '</b> — <span style="color:#173f6f">' + escH(title) + '</span></div>'
+            + '<label style="display:block;font-weight:700;margin-bottom:4px">إلى أيّ رقم؟ / À quel numéro ?</label>'
+            + waRecipHtml(phone)
+            + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+            + '<button type="button" id="ppWaSend" class="btn" style="background:#25D366;color:#fff;font-weight:700;font-size:15px"><i class="fab fa-whatsapp"></i> أرسل الملف / Envoyer</button>'
+            + '<button type="button" id="ppWaOld" class="btn btn-light" title="تنزيل الملف وفتح المحادثة يدوياً">الطريقة اليدوية</button>'
+            + '</div><div id="ppWaMsg" style="font-size:13.5px;margin-top:10px;line-height:1.7"></div>');
+        var inp = m.el.querySelector('#ppWaTo'), msg = m.el.querySelector('#ppWaMsg'), send = m.el.querySelector('#ppWaSend');
+        Array.prototype.forEach.call(m.el.querySelectorAll('input[name="msaWaRecip"]'), function (r) {
+            r.addEventListener('change', function () { if (r.value === 'other') { inp.value = ''; inp.focus(); } else inp.value = r.getAttribute('data-num') || ''; });
+        });
+        inp.addEventListener('input', function () { var o = m.el.querySelector('input[name="msaWaRecip"][value="other"]'), match = false;
+            Array.prototype.forEach.call(m.el.querySelectorAll('input[name="msaWaRecip"][data-num]'), function (r) { if (r.getAttribute('data-num') === inp.value.trim()) { r.checked = true; match = true; } });
+            if (!match && o) o.checked = true; });
+        if (!inp.value) inp.focus();
+        m.el.querySelector('#ppWaOld').addEventListener('click', function () { m.close(); fallback(); });
+        send.addEventListener('click', function () {
+            var to = inp.value.trim(), digits = to.replace(/\D/g, '');
+            if (digits.length < 7 || digits.length > 15) { msg.innerHTML = '<span style="color:#b91c1c">اكتب رقم واتساب صحيح (مثلاً 03 123 456)</span>'; inp.focus(); return; }
+            send.disabled = true; var old = send.innerHTML; send.textContent = '⏳ عم نجهّز الملف ونرسل...';
+            msg.textContent = '';
+            Promise.resolve().then(getPdf).then(function (r) {
+                var fd = new FormData();
+                fd.append('csrf', window.CSRF_TOKEN || ''); fd.append('to', to); fd.append('title', title); fd.append('pdf', r.blob, r.name);
+                return fetch((window.BASE_URL || '') + 'pages/send_whatsapp.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (x) { return x.json(); });
+            }).then(function (j) {
+                send.disabled = false; send.innerHTML = old;
+                if (j && j.ok) {
+                    msg.innerHTML = '<span style="color:#166534;font-weight:700">✅ ' + escH(j.msg || 'أُرسل') + '</span>' + (j.log ? ' <a href="' + escH(j.log) + '" target="_blank" rel="noopener">سجلّ الإرسال</a>' : '');
+                    send.style.display = 'none';
+                } else {
+                    msg.innerHTML = '<span style="color:#b91c1c;font-weight:700">' + escH((j && j.msg) || 'ما انبعت') + '</span>' + ((j && j.fallback) ? '<br><span style="color:#475569">فيك تستعمل «الطريقة اليدوية» هلّق.</span>' : '');
+                }
+            }).catch(function (e) {
+                send.disabled = false; send.innerHTML = old; try { console.error(e); } catch (_) {}
+                msg.innerHTML = '<span style="color:#b91c1c;font-weight:700">ما انبعت — ما في اتصال أو تعذّر تجهيز الملف.</span><br><span style="color:#475569">جرّب مرّة تانية أو استعمل «الطريقة اليدوية».</span>';
+            });
+        });
+    }
+    function waSendPdf(title, getPdf, fallback, phone) {
+        if (window.MSA_WA_DIRECT) { waDirect(title, getPdf, function () { waShareOld(title, getPdf, fallback); }, phone); return; }
+        waShareOld(title, getPdf, fallback);
+    }
+    function waShareOld(title, getPdf, fallback) {
         if (!canSharePdf()) { fallback(); return; }
         var m = shareModal(
             '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:10px"><i class="fab fa-whatsapp"></i> إرسال عبر واتساب / Envoyer par WhatsApp</div>'
@@ -585,7 +648,7 @@
     window.ppWhatsApp = function (title, phone) {
         waSendPdf(docTitle(title), function () {
             return window.msaPdfBlob ? window.msaPdfBlob() : Promise.reject(new Error('no pdf builder'));
-        }, function () { ppWhatsAppManual(title, phone); });
+        }, function () { ppWhatsAppManual(title, phone); }, phone);
     };
     // النافذة القديمة (تنزيل الملف ثم فتح المحادثة) — احتياط للمتصفّح الذي لا يشارك ملفات
     function ppWhatsAppManual(title, phone) {
@@ -633,7 +696,7 @@
                     if (!/pdf/i.test(bl.type)) throw new Error('not a pdf');
                     return { blob: bl, name: safeName(o.title || 'formulaire') + '.pdf' };
                 });
-            }, offWaManual);
+            }, offWaManual, o.phone);
         });
         function offWaManual() {
             var text =(o.title || '') + '\n' + location.origin + o.base + o.target;

@@ -42,6 +42,7 @@ $viaLabel = function (string $v): string {
         case 'resend_api': case 'resend_smtp': case 'program': return 'إيميل البرنامج (خدمة الإرسال)';
         case 'school_smtp': case 'smtp': return 'إيميل المدرسة';
         case 'server_mail': return 'بريد الخادم';
+        case 'whatsapp': return 'واتساب مباشر';
         case 'relay': return 'عبر الموقع';
     }
     return $v !== '' ? $v : '—';

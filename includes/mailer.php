@@ -628,6 +628,7 @@ function msaMailStatusLabel(string $st): array {
         case 'failed': return ['✕ لم يُرسَل / Non envoyé', '#e0e7ff', '#173f6f'];
         case 'canceled': return ['✕ أُلغي / Annulé', '#e0e7ff', '#173f6f'];
         case 'sent': case 'queued': return ['📤 خرج — بانتظار تأكيد الوصول / Envoyé', '#f1f5f9', '#334155'];
+        case 'wa_sent': return ['📲 تسلّم لواتساب / Remis à WhatsApp', '#dcfce7', '#166534'];
     }
     return [$st ?: '—', '#f1f5f9', '#334155'];
 }

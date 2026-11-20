@@ -18,6 +18,16 @@
       if ($msaMailEid > 0) { try { $msaMailRow = getDB()->query("SELECT email, first_name_ar, last_name_ar, first_name_fr, last_name_fr FROM employees WHERE id = $msaMailEid AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
           if ($msaMailRow) { $msaMailTEmail = trim((string)$msaMailRow['email']); if (!filter_var($msaMailTEmail, FILTER_VALIDATE_EMAIL)) $msaMailTEmail = '';
               $msaMailTName = trim(($msaMailRow['first_name_ar'] ?: $msaMailRow['first_name_fr']) . ' ' . ($msaMailRow['last_name_ar'] ?: $msaMailRow['last_name_fr'])); } } catch (Throwable $t) {} } ?>
+<?php // 📲 (2026-11-20) الإرسال المباشر بالواتساب: مفعَّل لمن يقدر يعدّل فقط؛ الأرقام المقترحة = هاتف الأستاذ المعروض وموبايل المدرسة المختارة
+      $msaWaOn = false; $msaWaFrom = ''; $msaWaSch = ''; $msaWaT = '';
+      try { require_once __DIR__ . '/wa_cloud.php'; if (function_exists('canEdit') && canEdit() && msaWaEnabled()) { $msaWaOn = true; $msaWaFrom = (string)msaWaCfg()['from'];
+          $msaWaSch = trim((string)(($msaMailSch['mobile_phone'] ?? '') ?: ($msaMailSch['phone'] ?? ''))); if (!msaWaIsMobile($msaWaSch)) { $msaWaSch = trim((string)($msaMailSch['phone'] ?? '')); if (!msaWaIsMobile($msaWaSch)) $msaWaSch = ''; }   // خلوي فقط (الأرضي لا يستقبل واتساب)
+          if ($msaMailEid > 0) { $msaWaRow = getDB()->query("SELECT phone1, phone2 FROM employees WHERE id = $msaMailEid AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC); foreach ([$msaWaRow['phone1'] ?? '', $msaWaRow['phone2'] ?? ''] as $msaWaP) if ($msaWaT === '' && msaWaIsMobile((string)$msaWaP)) $msaWaT = trim((string)$msaWaP); } } } catch (Throwable $t) {} ?>
+<?php // 🏛️ (2026-11-20) الرئاسة العامة: اسمها ورقمها وإيميلها محفوظة بالإعدادات ⇒ خيار جاهز بنافذتَي الواتساب والإيميل
+      $msaHq = ['name' => '', 'wa' => '', 'email' => '']; try { if (function_exists('canEdit') && canEdit()) { $msaHq = ['name' => trim((string)getSetting('hq_contact_name', '')), 'wa' => trim((string)getSetting('hq_contact_whatsapp', '')), 'email' => trim((string)getSetting('hq_contact_email', ''))];
+          if (!filter_var($msaHq['email'], FILTER_VALIDATE_EMAIL)) $msaHq['email'] = ''; if ($msaHq['name'] === '') $msaHq['name'] = 'الرئاسة العامة'; } } catch (Throwable $t) {} ?>
+<script>window.MSA_HQ_NAME = <?= json_encode($msaHq['name']) ?>; window.MSA_HQ_WA = <?= json_encode($msaHq['wa']) ?>; window.MSA_HQ_EMAIL = <?= json_encode($msaHq['email']) ?>;</script>
+<script>window.MSA_WA_DIRECT = <?= json_encode($msaWaOn) ?>; window.MSA_WA_FROM = <?= json_encode($msaWaFrom) ?>; window.MSA_SCHOOL_WA = <?= json_encode($msaWaSch) ?>; window.MSA_TEACHER_WA = <?= json_encode($msaWaT) ?>;</script>
 <script>window.MSA_SCHOOL_EMAIL = <?= json_encode($msaMailSchEmail) ?>; window.MSA_SCHOOL_NAME = <?= json_encode((string)(($msaMailSch['name_ar'] ?? '') ?: ($msaMailSch['name_fr'] ?? ''))) ?>; window.MSA_TEACHER_EMAIL = <?= json_encode($msaMailTEmail) ?>; window.MSA_TEACHER_NAME = <?= json_encode($msaMailTName) ?>;</script>
 <script src="<?= BASE_URL ?>assets/js/doclang.js?v=<?= @filemtime(__DIR__ . '/../assets/js/doclang.js') ?: '1' ?>"></script>
 <script src="<?= BASE_URL ?>assets/js/totals.js?v=<?= @filemtime(__DIR__ . '/../assets/js/totals.js') ?: '1' ?>"></script><?php /* ➕ (2026-10-17) عمود مجموع السطر / مجموع كل فئة بكل التقارير */ ?>
