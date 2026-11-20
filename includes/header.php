@@ -26,6 +26,7 @@ healCadreEocIncludesExtra();      // 🩹⚖️ (2026-09-26) ملاك بإضاف
 healNetExact_20261115(); healNetMathRows();                // 🩹 (2026-09-17) شهر غير مدفوع لا تركب أرقامه → إعادة حساب بالمسار الآمن recalcEmployeeYear
 ensureEocHalfExtraColumns20261116(); ensureCnssBranchColumns20261116(); healCnssBranches_20261116(); // 🌍⚖️ (2026-11-16) فروع الضمان بالملف + غير اللبناني بلا نهاية خدمة 8,5٪ بكل السنين (المادة 9)
 healStaleYearMirror20260806(); // شفاء ذاتي مرّة واحدة: إعادة حساب السنين المفتوحة والسنين التي مخزّنها لا يطابق علاوات الملف (حالة مارسيلا — الكشف يطابق الملف)
+ensureCnssQuarterlyColumn20261120(); // 🗓️ (2026-11-20) المؤسّسات التي ضمانها فصلي (schools.cnss_quarterly)
 ensureYearLockTable();         // 🔒 تركيب ذاتي: جدول أقفال السنة الدراسية لكل مدرسة (2026-09-12) — خارج أي معاملة
 ensureGradeUserEditedColumn();
 healHananAfterLeave20261003(); // 🚪🩹 (2026-10-03 «شيل حنان تحومي كمان») مرّة واحدة: أشهرها بعد 30/4/2026

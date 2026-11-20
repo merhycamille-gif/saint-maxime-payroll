@@ -12170,7 +12170,7 @@ try {
 try {
     $numD = fn($x) => (float)str_replace(',', '.', preg_replace('/,(?=\d{3}(\D|$))/', '', preg_replace('/[^\d,.-]/', '', (string)$x)));
     $mixQ = ['report' => 'dues_summary', 'kinds_set' => 1, 'kinds' => ['cnss', 'eoc', 'tax'], 'per_cnss' => 'month', 'month_cnss' => 10, 'year_cnss' => 2026, 'rate_cnss' => '89500',
-             'per_eoc' => 'quarter', 'q_eoc' => 4, 'year_eoc' => 2026, 'rate_eoc' => '89000', 'per_tax' => 'quarter', 'q_tax' => 4, 'year_tax' => 2026, 'rate_tax' => '90000', 'schools' => [3]];
+             'per_eoc' => 'quarter', 'q_eoc' => 1, 'sy_eoc' => 2026, 'rate_eoc' => '89000', 'per_tax' => 'quarter', 'q_tax' => 4, 'year_tax' => 2026, 'rate_tax' => '90000', 'schools' => [3]];
     $hX = renderPage('pages/reports.php', $mixQ, ['extra', 'aide'], [3], 'lbp', '2026-2027');
     $tX = $cellsD($hX); $rX = $tX[1] ?? [];
     $cnX = (int)preg_replace('/[^\d-]/', '', $rX[2] ?? ''); $eoX = (int)preg_replace('/[^\d-]/', '', $rX[4] ?? ''); $txX = (int)preg_replace('/[^\d-]/', '', $rX[6] ?? '');
@@ -12178,16 +12178,50 @@ try {
     $okMixNum = count($rX) === 10 && $cnX === $cn && $cnX > 0 && $eoX === $eoQ && $eoX > $eo && $txX === $txQ && (int)preg_replace('/[^\d-]/', '', $rX[8] ?? '') === $cnX + $eoX + $txX;
     $okMixUsd = abs($numD($rX[3] ?? '') - round($cnX / 89500, 2)) < 0.011 && abs($numD($rX[5] ?? '') - round($eoX / 89000, 2)) < 0.011 && abs($numD($rX[7] ?? '') - round($txX / 90000, 2)) < 0.011
         && abs($numD($rX[9] ?? '') - (round($cnX / 89500, 2) + round($eoX / 89000, 2) + round($txX / 90000, 2))) < 0.011;
-    $okMixHead = strpos($hX, '1 $ = 89,500') !== false && strpos($hX, '1 $ = 89,000') !== false && strpos($hX, '1 $ = 90,000') !== false && strpos($hX, 'الفصل 4 2026') !== false
+    $okMixHead = strpos($hX, '1 $ = 89,500') !== false && strpos($hX, '1 $ = 89,000') !== false && strpos($hX, '1 $ = 90,000') !== false && strpos($hX, 'الفصل 4 2026') !== false && strpos($hX, 'الفصل 1 2026-2027') !== false
         && strpos($hX, 'name="per_tax"') !== false && strpos($hX, 'name="rate_eoc"') !== false && stripos($hX, 'Fatal error') === false;
     $xX = $sheet184(renderPage('pages/reports_export.php', $mixQ + ['format' => 'xlsx'], ['extra', 'aide'], [3], 'lbp', '2026-2027', $PROJ . '/tools/_rdues2.xlsx'));
     $okMixXls = strpos($xX, (string)$cnX) !== false && strpos($xX, (string)$eoX) !== false && strpos($xX, 'سعر الدولار 89,000') !== false;
     $rhS = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
     $okMixSrc = strpos($rhS, "\$_GET['per_' . \$k]") !== false && strpos($rhS, "'uniform' => \$uniform") !== false
-        && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "preg_grep('/^(per|month|q|year|rate)_(cnss|eoc|tax)\$/'") !== false;
+        && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "preg_grep('/^((per|month|q|year|rate)_(cnss|eoc|tax)|sy_eoc)\$/'") !== false;
     check('🗓️💱 (2026-11-20) المتوجّبات حسب المدرسة: لكل جهة فترتها (شهري/فصلي) وسعر صرفها بنفس التقرير — الضمان شهري = الكشف الشهري، الصندوق/المالية فصلي = مجموع أشهره، وكل عمود دولاره بسعره · شاشة + إكسل + رابط التصدير',
         $okMixNum && $okMixUsd && $okMixHead && $okMixXls && $okMixSrc, 'num=' . (int)$okMixNum . ' usd=' . (int)$okMixUsd . ' head=' . (int)$okMixHead . ' xls=' . (int)$okMixXls . ' src=' . (int)$okMixSrc . " cnss=$cnX eoc=$eoX tax=$txX/$txQ");
 } catch (Throwable $e) { check('🗓️💱 (2026-11-20) المتوجّبات حسب المدرسة: لكل جهة فترتها وسعرها', false, $e->getMessage()); }
+/* 🗓️🏫 (2026-11-20 «كسارة - مكسيموس عبرا - العلاج الفيزيائي ضمان فصلي، الباقيين ضمان شهري… المالية وصندوق التعويضات أكيد فصلي، بس انتبه: الفصل الأول لصندوق التعويضات
+ *    ببلّش ت1-ت2-ك1… بس صندوق التعويضات سنة مدرسية بتبلّش 1-10 والباقي سنة ميلادية بتبلّش 1-1»)
+ *    schools.cnss_quarterly (تركيب ذاتي + بذرة 11/13/18 + خيار بصفحة المدرسة) · per_cnss=auto: الفصلية بالفصل والباقي بالشهر · فصل الصندوق sy_eoc/q_eoc على السنة المدرسية · أوّل فتحة = حسب المؤسّسة + فصلي. */
+try {
+    ensureCnssQuarterlyColumn20261120(); $qIdsR = cnssQuarterlySchoolIds(true); $qIdsR = cnssQuarterlySchoolIds();
+    $okCol = (int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schools' AND COLUMN_NAME = 'cnss_quarterly'")->fetchColumn() === 1 && in_array(11, $qIdsR, true);
+    $qS = fn(int $sid, string $expr, string $cond, string $in, int $yr) => (int)round((float)$db->query("SELECT COALESCE(SUM($expr),0) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE ms.year = $yr AND ms.month IN ($in) AND ms.school_id = $sid AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) $cond")->fetchColumn());
+    $cnE = "ms.cnss_amount_lbp + ms.school_cnss_8_lbp + IF(e.employee_type = 'employe', ms.school_family_comp_6_lbp + ms.school_end_of_service_8_5_lbp - ms.family_allowance_lbp, 0)";
+    $autoQ = ['report' => 'dues_summary', 'kinds_set' => 1, 'kinds' => ['cnss', 'eoc'], 'per_cnss' => 'auto', 'month_cnss' => 10, 'q_cnss' => 4, 'year_cnss' => 2026, 'rate_cnss' => '89500',
+              'per_eoc' => 'quarter', 'sy_eoc' => 2025, 'q_eoc' => 4, 'rate_eoc' => '89500', 'schools' => [3, 11]];
+    $hA = renderPage('pages/reports.php', $autoQ, ['extra', 'aide'], [3, 11], 'lbp', '2026-2027');
+    $tA = $cellsD($hA); $rowsA = array_values(array_filter($tA, fn($r) => isset($r[0]) && ctype_digit((string)$r[0])));
+    $r3 = null; $r11 = null; foreach ($rowsA as $r) { if (strpos($r[1], 'Hadath') !== false) $r3 = $r; if (strpos($r[1], 'Ksara') !== false) $r11 = $r; }
+    $iv = fn($x) => (int)preg_replace('/[^\d-]/', '', (string)$x);
+    $okAuto = $r3 && $r11 && $iv($r3[2]) === $qS(3, $cnE, ' AND e.cnss_subject = 1', '10', 2026) && $iv($r3[2]) > 0
+        && $iv($r11[2]) === $qS(11, $cnE, ' AND e.cnss_subject = 1', '10,11,12', 2026) && $iv($r11[2]) > $qS(11, $cnE, ' AND e.cnss_subject = 1', '10', 2026)
+        && strpos($r11[1], 'الفصل 4 2026') !== false && strpos($r3[1], 'الفصل') === false;
+    // فصل الصندوق الرابع 2025-2026 = تموز + آب + أيلول 2026 (سنة مدرسية)
+    $okSy = $r3 && $iv($r3[4]) === $qS(3, 'ms.caisse_amount_lbp + ms.eoc_grade_lbp + ms.school_eoc_6_lbp', " AND e.employee_type = 'enseignant_titulaire'", '7,8,9', 2026) && $iv($r3[4]) > 0
+        && strpos($hA, 'الفصل 4 2025-2026') !== false && duesQuarter('eoc', 1, 2026) === [[10, 11, 12], 2026] && duesQuarter('eoc', 2, 2026) === [[1, 2, 3], 2027] && duesQuarter('tax', 1, 2026) === [[1, 2, 3], 2026];
+    // أوّل فتحة بلا خيارات
+    $hF = renderPage('pages/reports.php', ['report' => 'dues_summary', 'schools' => [3]], ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $okFirst = preg_match('/<option value="auto" selected>/', $hF) === 1 && preg_match('/name="per_eoc".*?<option value="quarter" selected>/su', $hF) === 1 && preg_match('/name="per_tax".*?<option value="quarter" selected>/su', $hF) === 1 && stripos($hF, 'Fatal error') === false;
+    $xA = $sheet184(renderPage('pages/reports_export.php', $autoQ + ['format' => 'xlsx'], ['extra', 'aide'], [3, 11], 'lbp', '2026-2027', $PROJ . '/tools/_rdues3.xlsx'));
+    @unlink($PROJ . '/tools/_rdues3.xlsx'); @unlink($PROJ . '/tools/_rdues2.xlsx');
+    $okAx = $r11 && strpos($xA, (string)$iv($r11[2])) !== false && strpos($xA, '* فصلي: الفصل 4 2026') !== false;
+    $ecS = (string)file_get_contents($PROJ . '/pages/ecoles.php');
+    $okSrcQ = strpos($ecS, "'cnss_quarterly' => ((\$_POST['cnss_quarterly'] ?? '0') === '1') ? 1 : 0,") !== false && strpos($ecS, 'name="cnss_quarterly"') !== false
+        && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'ensureCnssQuarterlyColumn20261120();') !== false;
+    check('🗓️🏫 (2026-11-20) المتوجّبات: الضمان حسب المؤسّسة (كسارة/مكسيموس عبرا/العلاج الفيزيائي فصلي والباقي شهري — schools.cnss_quarterly) · فصل صندوق التعويضات على السنة المدرسية (ف1 = ت1–ك1) والمالية/الضمان ميلادية · أوّل فتحة فصلي',
+        $okCol && $okAuto && $okSy && $okFirst && $okAx && $okSrcQ, 'col=' . (int)$okCol . ' auto=' . (int)$okAuto . ' sy=' . (int)$okSy . ' first=' . (int)$okFirst . ' xls=' . (int)$okAx . ' src=' . (int)$okSrcQ . ' r3=' . json_encode($r3, JSON_UNESCAPED_UNICODE) . ' r11=' . json_encode($r11, JSON_UNESCAPED_UNICODE));
+} catch (Throwable $e) { check('🗓️🏫 (2026-11-20) المتوجّبات: الضمان حسب المؤسّسة + فصل الصندوق على السنة المدرسية', false, $e->getMessage()); }
+
 
 
 /* ⏱️ قياس الوقت (اختياري: REG_TIMING=1) */

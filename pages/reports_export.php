@@ -168,24 +168,27 @@ if ($report === 'monthly_summary') {
 
 } elseif ($report === 'dues_summary') {
     // 🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة — نفس مصدر الشاشة (duesParams + duesRows)
-    // 🗓️💱 (2026-11-20) لكل جهة فترتها وسعرها: رأس كل عمود يحملهما حين تختلف الجهات
+    // 🗓️💱 (2026-11-20) لكل جهة فترتها وسعرها: رأس كل عمود يحملهما حين تختلف الجهات · الضمان «حسب المؤسّسة» ⇒ عمود «فترة الضمان» لكل مدرسة
     $P = duesParams(); $dRows = duesRows($db, $P); $dK = $P['kinds']; $dLab = duesKinds(); $dMulti = count($dK) > 1; $dC = $P['cfg'];
+    $dLabAr = fn($kk) => ($dC[$kk]['label_all'] ?? $dC[$kk]['label'])['ar'];
+    $dAuto = in_array('cnss', $dK, true) && $dC['cnss']['per'] === 'auto';
     $rep = new ReportTable('المتوجّبات حسب المدرسة' . ($P['uniform'] ? ' — ' . $P['label']['ar'] . ' — 1 $ = ' . nfc($P['rate'], 2) . ' ل.ل'
-        : ' — ' . implode(' · ', array_map(fn($kk) => $dLab[$kk] . ': ' . $dC[$kk]['label']['ar'] . ' (سعر الدولار ' . nfc($dC[$kk]['rate'], 2) . ')', $dK))), false);
+        : ' — ' . implode(' · ', array_map(fn($kk) => $dLab[$kk] . ': ' . $dLabAr($kk) . ' (سعر الدولار ' . nfc($dC[$kk]['rate'], 2) . ')', $dK))), false);
     $rep->schoolHeader($school);
     $head = ['#', 'المدرسة'];
-    foreach ($dK as $kk) { $head[] = $dLab[$kk] . ' (ل.ل)' . ($P['uniform'] ? '' : ' — ' . $dC[$kk]['label']['ar']); $head[] = $dLab[$kk] . ' ($)' . ($P['uniform'] ? '' : ' — سعر الدولار ' . nfc($dC[$kk]['rate'], 2)); }   // صيغة عربية: «1 $ = …» تنقلب بورقة من اليمين
+    foreach ($dK as $kk) { $head[] = $dLab[$kk] . ' (ل.ل)' . ($P['uniform'] ? '' : ' — ' . ($kk === 'cnss' && $dAuto ? $dC['cnss']['label']['ar'] . ' (* فصلي: ' . $dC['cnss']['qcfg']['short']['ar'] . ')' : ($dC[$kk]['short']['ar'] ?? $dLabAr($kk)))); $head[] = $dLab[$kk] . ' ($)' . ($P['uniform'] ? '' : ' — سعر الدولار ' . nfc($dC[$kk]['rate'], 2)); }   // صيغة عربية: «1 $ = …» تنقلب بورقة من اليمين
     if ($dMulti) { $head[] = 'المجموع (ل.ل)'; $head[] = 'المجموع ($)'; }
     $rep->head($head);
     $dT = array_fill_keys($dK, 0); $dTu = array_fill_keys($dK, 0.0); $dG = 0; $dGu = 0.0; $rn = 0;
     foreach ($dRows as $r) {
-        $row = [++$rn, $r['fr'] . ' / ' . $r['ar']]; $rowT = 0; $rowU = 0.0;
+        $row = [++$rn, $r['fr'] . ' / ' . $r['ar'] . (($dAuto && !empty($r['cnss_q'])) ? ' *' : '')]; $rowT = 0; $rowU = 0.0;   // * = مؤسّسة ضمانها فصلي (الفصل مكتوب برأس عمود الضمان) — علامة قصيرة حتى لا يتّسع عمود المدرسة فتنقسم الورقة
         foreach ($dK as $kk) { $v = (int)$r[$kk]; $u = round($v / $dC[$kk]['rate'], 2); $dT[$kk] += $v; $dTu[$kk] += $u; $rowT += $v; $rowU += $u; $row[] = $v ?: ''; $row[] = $v ? $u : ''; }
         if ($dMulti) { $dG += $rowT; $dGu += $rowU; $row[] = $rowT ?: ''; $row[] = $rowT ? round($P['uniform'] ? $rowT / $P['rate'] : $rowU, 2) : ''; }
         $rep->row($row);
     }
     if ($dRows && $dK) {
-        $row = ['', 'المجموع']; foreach ($dK as $kk) { $row[] = $dT[$kk]; $row[] = round($P['uniform'] ? $dT[$kk] / $dC[$kk]['rate'] : $dTu[$kk], 2); }
+        $row = ['', 'المجموع'];
+        foreach ($dK as $kk) { $row[] = $dT[$kk]; $row[] = round($P['uniform'] ? $dT[$kk] / $dC[$kk]['rate'] : $dTu[$kk], 2); }
         if ($dMulti) { $row[] = $dG; $row[] = round($P['uniform'] ? $dG / $P['rate'] : $dGu, 2); }
         $rep->totalRow($row);
     }

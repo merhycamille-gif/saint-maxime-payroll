@@ -2251,6 +2251,24 @@ function ensureEocHalfExtraColumns20261116(): void {
         }
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
+/* 🗓️ (2026-11-20 «كسارة - مكسيموس عبرا - العلاج الفيزيائي ضمان فصلي، الباقيين ضمان شهري») المؤسّسة التي تصرّح عن الضمان فصلياً:
+ *    schools.cnss_quarterly = 1 (يتركّب ذاتياً خارج أي معاملة؛ عند التركيب تُعلَّم المؤسّسات الثلاث مرّة واحدة — وبعدها تتغيّر من صفحة المدرسة). */
+function ensureCnssQuarterlyColumn20261120(): void {
+    static $done = false; if ($done) return; $done = true;
+    try {
+        $db = getDB();
+        if (!(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schools' AND COLUMN_NAME = 'cnss_quarterly'")->fetchColumn()) {
+            $db->exec("ALTER TABLE `schools` ADD COLUMN `cnss_quarterly` TINYINT(1) NOT NULL DEFAULT 0");
+            $db->exec("UPDATE schools SET cnss_quarterly = 1 WHERE id IN (11, 13, 18)");   // كسارة · مكسيموس عبرا · العلاج الفيزيائي
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+/** أرقام المؤسّسات التي ضمانها فصلي. */
+function cnssQuarterlySchoolIds(bool $reset = false): array {
+    static $ids = null; if ($reset) { $ids = null; return []; }
+    if ($ids === null) { ensureCnssQuarterlyColumn20261120(); try { $ids = array_map('intval', getDB()->query("SELECT id FROM schools WHERE cnss_quarterly = 1 AND is_deleted = 0")->fetchAll(PDO::FETCH_COLUMN)); } catch (Throwable $e) { $ids = []; } }
+    return $ids;
+}
 /** السنة التي يبدأ منها خيار المدرسة ('' = مطفأ). $reset = true يمسح الكاش بعد حفظ صفحة المدرسة. */
 function eocHalfExtraSchoolFrom(int $schoolId, bool $reset = false): string {
     static $map = null;

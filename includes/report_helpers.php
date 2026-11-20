@@ -1075,36 +1075,64 @@ function duesSchoolShortNames(): array {
             18 => ['Physiothérapie', 'العلاج الفيزيائي'], 20 => ['Damour', 'الدامور'], 2 => ['Maximos', 'مكسيموس']];
 }
 function duesKinds(): array { return ['cnss' => 'الضمان', 'eoc' => 'صندوق التعويضات', 'tax' => 'المالية']; }
-/** يقرأ خيارات التقرير من الرابط. 🗓️💱 (2026-11-20) لكل جهة فترتها وسعرها: per_<k> (month|quarter) · month_<k> · q_<k> · year_<k> · rate_<k>
- *  (k = cnss|eoc|tax)؛ ما لم يُذكر لجهة يأخذ العامّ (per/month/q/year/rate) كما كان — الروابط القديمة تعطي نفس التقرير. */
+/** أشهر الفصل وسنته الميلادية. 🗓️ (2026-11-20) صندوق التعويضات سنة مدرسية (ف1 = ت1، ت2، ك1 من سنة البداية؛ ف2–ف4 بالسنة التالية)؛ الضمان والمالية سنة ميلادية (ف1 = ك2، شباط، آذار). */
+function duesQuarter(string $kind, int $q, int $y): array {
+    $q = max(1, min(4, $q));
+    if ($kind === 'eoc') return $q === 1 ? [[10, 11, 12], $y] : [[($q - 2) * 3 + 1, ($q - 2) * 3 + 2, ($q - 2) * 3 + 3], $y + 1];
+    return [[($q - 1) * 3 + 1, ($q - 1) * 3 + 2, ($q - 1) * 3 + 3], $y];
+}
+/** يقرأ خيارات التقرير من الرابط. 🗓️💱 (2026-11-20) لكل جهة فترتها وسعرها (k = cnss|eoc|tax):
+ *    per_<k> = month | quarter (+ للضمان auto = حسب المؤسّسة: الفصلية بالفصل والباقي بالشهر) · month_<k> · q_<k> · year_<k> (ميلادية) · sy_eoc (سنة بداية السنة المدرسية لفصل الصندوق) · rate_<k>
+ *  الروابط القديمة (per/month/q/year/rate العامّة بلا مفاتيح الجهات) تعطي نفس التقرير القديم بالحرف (فصل ميلادي للكل).
+ *  أوّل فتحة بلا أي خيار: الضمان حسب المؤسّسة، الصندوق والمالية فصلي. */
 function duesParams(): array {
+    $legacy = isset($_GET['per']);                                           // رابط قديم: فترة واحدة للكل
     $gPer = (($_GET['per'] ?? 'month') === 'quarter') ? 'quarter' : 'month';
     $gMonth = max(1, min(12, (int)($_GET['month'] ?? date('n')))); $gYear = (int)($_GET['year'] ?? date('Y'));
     $gQ = max(1, min(4, (int)($_GET['q'] ?? (int)ceil($gMonth / 3))));
     // ☑️ المشيّك فقط يبيّن؛ أوّل فتحة (بلا kinds_set) = الثلاثة
     $kinds = isset($_GET['kinds_set']) ? array_values(array_intersect(array_keys(duesKinds()), (array)($_GET['kinds'] ?? []))) : array_keys(duesKinds());
-    $one = function (string $per, int $month, int $q, int $year, $rateRaw): array {
-        $months = $per === 'quarter' ? [($q - 1) * 3 + 1, ($q - 1) * 3 + 2, ($q - 1) * 3 + 3] : [$month];
+    $mk = function (array $months, int $year, string $per, array $extra, $rateRaw): array {
         $rate = numLoose($rateRaw ?? ''); if ($rate <= 0) $rate = (float)getExchangeRate($months[0], $year);
-        $mAr = array_map(fn($m) => monthName($m, 'ar'), $months); $mFr = array_map(fn($m) => monthName($m, 'fr'), $months);
-        $label = $per === 'quarter'
-            ? ['fr' => 'Trimestre ' . $q . ' ' . $year . ' (' . $mFr[0] . ' – ' . $mFr[2] . ')', 'ar' => 'الفصل ' . $q . ' ' . $year . ' (' . $mAr[0] . ' – ' . $mAr[2] . ')']
-            : ['fr' => $mFr[0] . ' ' . $year, 'ar' => $mAr[0] . ' ' . $year];
-        return ['per' => $per, 'month' => $month, 'q' => $q, 'year' => $year, 'months' => $months, 'rate' => $rate, 'label' => $label];
+        return ['per' => $per, 'months' => $months, 'year' => $year, 'rate' => $rate] + $extra;
     };
+    $mLab = fn(int $m, int $y) => ['fr' => monthName($m, 'fr') . ' ' . $y, 'ar' => monthName($m, 'ar') . ' ' . $y];
+    $qLab = fn(int $q, array $ms, string $yTxt) => ['fr' => 'Trimestre ' . $q . ' ' . $yTxt . ' (' . monthName($ms[0], 'fr') . ' – ' . monthName($ms[2], 'fr') . ')', 'ar' => 'الفصل ' . $q . ' ' . $yTxt . ' (' . monthName($ms[0], 'ar') . ' – ' . monthName($ms[2], 'ar') . ')'];
+    $syOf = fn(int $m, int $y) => $m >= 10 ? $y : $y - 1;                    // سنة بداية السنة المدرسية التي يقع فيها الشهر
     $cfg = [];
     foreach (array_keys(duesKinds()) as $k) {
-        $per = isset($_GET['per_' . $k]) ? ((($_GET['per_' . $k]) === 'quarter') ? 'quarter' : 'month') : $gPer;
+        $has = isset($_GET['per_' . $k]);
+        $perDef = $legacy ? $gPer : ($k === 'cnss' ? 'auto' : 'quarter');
+        $perRaw = $has ? (string)$_GET['per_' . $k] : $perDef;
+        $per = in_array($perRaw, $k === 'cnss' ? ['month', 'quarter', 'auto'] : ['month', 'quarter'], true) ? $perRaw : ($k === 'cnss' && !$legacy ? 'auto' : 'month');
         $month = isset($_GET['month_' . $k]) ? max(1, min(12, (int)$_GET['month_' . $k])) : $gMonth;
-        $q = isset($_GET['q_' . $k]) ? max(1, min(4, (int)$_GET['q_' . $k])) : (isset($_GET['month_' . $k]) && !isset($_GET['q']) ? (int)ceil($month / 3) : $gQ);
         $year = (isset($_GET['year_' . $k]) && (int)$_GET['year_' . $k] > 1990) ? (int)$_GET['year_' . $k] : $gYear;
-        $cfg[$k] = $one($per, $month, $q, $year, $_GET['rate_' . $k] ?? ($_GET['rate'] ?? ''));
+        $rateRaw = $_GET['rate_' . $k] ?? ($_GET['rate'] ?? '');
+        $sySchool = $k === 'eoc' && !($legacy && !$has);                     // فصل الصندوق على السنة المدرسية (إلّا الرابط القديم)
+        if ($sySchool) {
+            $sy = (isset($_GET['sy_eoc']) && (int)$_GET['sy_eoc'] > 1990) ? (int)$_GET['sy_eoc'] : $syOf($month, $year);
+            $q = isset($_GET['q_eoc']) ? max(1, min(4, (int)$_GET['q_eoc'])) : ($month >= 10 ? 1 : (int)ceil($month / 3) + 1);
+            [$qm, $qy] = duesQuarter('eoc', $q, $sy); $qTxt = $sy . '-' . ($sy + 1);
+        } else {
+            $sy = $syOf($month, $year);
+            $q = isset($_GET['q_' . $k]) ? max(1, min(4, (int)$_GET['q_' . $k])) : (isset($_GET['month_' . $k]) && !isset($_GET['q']) ? (int)ceil($month / 3) : ($has || !$legacy ? (int)ceil($month / 3) : $gQ));
+            if ($legacy && !$has) $q = $gQ;
+            [$qm, $qy] = duesQuarter('tax', $q, $year); $qTxt = (string)$year;
+        }
+        $base = ['month' => $month, 'q' => $q, 'ycal' => $year, 'sy' => $sy, 'sy_mode' => $sySchool];
+        if ($per === 'quarter') $cfg[$k] = $mk($qm, $qy, 'quarter', $base + ['label' => $qLab($q, $qm, $qTxt), 'short' => ['fr' => 'Trimestre ' . $q . ' ' . $qTxt, 'ar' => 'الفصل ' . $q . ' ' . $qTxt]], $rateRaw);   // short: لرأس العمود (الأشهر تبقى بسطر العنوان فوق)
+        elseif ($per === 'auto') {                                           // الضمان حسب المؤسّسة: الشهر للشهرية والفصل للفصلية
+            $c = $mk([$month], $year, 'auto', $base + ['label' => $mLab($month, $year)], $rateRaw);
+            $c['qcfg'] = ['months' => $qm, 'year' => $qy, 'label' => $qLab($q, $qm, $qTxt), 'short' => ['fr' => 'Trimestre ' . $q . ' ' . $qTxt, 'ar' => 'الفصل ' . $q . ' ' . $qTxt]];   // short: لخانة «فترة الضمان» (العمود يبقى ضيّقاً والورقة واحدة)
+            $c['label_all'] = ['fr' => 'Mensuel : ' . $c['label']['fr'] . ' · Trimestriel : ' . $c['qcfg']['short']['fr'], 'ar' => 'شهري: ' . $c['label']['ar'] . ' · فصلي: ' . $c['qcfg']['short']['ar']];
+            $cfg[$k] = $c;
+        } else $cfg[$k] = $mk([$month], $year, 'month', $base + ['label' => $mLab($month, $year)], $rateRaw);
     }
-    // الجهات المشيّكة كلّها بنفس الفترة والسعر؟ ⇒ عنوان واحد كما كان؛ وإلّا كل عمود يحمل فترته وسعره
+    // الجهات المشيّكة كلّها بنفس الفترة والتسمية والسعر؟ ⇒ عنوان واحد كما كان؛ وإلّا كل عمود يحمل فترته وسعره
     $sel = array_values(array_intersect_key($cfg, array_flip($kinds))); $uniform = true;
-    foreach ($sel as $c) if ($c['months'] !== $sel[0]['months'] || $c['year'] !== $sel[0]['year'] || abs($c['rate'] - $sel[0]['rate']) > 0.0001) { $uniform = false; break; }
-    $main = $sel[0] ?? $one($gPer, $gMonth, $gQ, $gYear, $_GET['rate'] ?? '');
-    return ['kinds' => $kinds, 'cfg' => $cfg, 'uniform' => $uniform] + $main;   // المفاتيح القديمة (per/month/q/year/months/rate/label) = أوّل جهة مشيّكة
+    foreach ($sel as $c) if ($c['per'] === 'auto' || $c['months'] !== $sel[0]['months'] || $c['year'] !== $sel[0]['year'] || $c['label']['ar'] !== $sel[0]['label']['ar'] || abs($c['rate'] - $sel[0]['rate']) > 0.0001) { $uniform = false; break; }
+    $main = $sel[0] ?? $cfg['cnss'];
+    return ['kinds' => $kinds, 'cfg' => $cfg, 'uniform' => $uniform, 'legacy' => $legacy] + $main;   // المفاتيح القديمة (per/month/q/year/months/rate/label) = أوّل جهة مشيّكة
 }
 /** المبالغ: [school_id => ['cnss'=>, 'eoc'=>, 'tax'=>]] لأشهر الفترة — نفس شروط الكشوف الشهرية الثلاثة (المدارس المشيّكة + موظفو السنة المعروضة). */
 function duesBySchool(PDO $db, array $months, int $year): array {
@@ -1124,14 +1152,16 @@ function duesBySchool(PDO $db, array $months, int $year): array {
     $run('tax', "ms.income_tax_lbp", " AND e.tax_subject = 1");
     return $out;
 }
-/** صفوف التقرير بترتيب ملفّه: كل مدرسة مشيّكة (حتى لو صفر) ⇒ ['sid','fr','ar','cnss','eoc','tax']. */
+/** صفوف التقرير بترتيب ملفّه: كل مدرسة مشيّكة (حتى لو صفر) ⇒ ['sid','fr','ar','cnss_q','cnss','eoc','tax']. */
 function duesRows(PDO $db, array $P): array {
-    // 🗓️ (2026-11-20) كل جهة تُحسَب على فترتها هي (الفترة الواحدة = استعلام واحد كما كان)
-    $data = []; $cache = [];
+    // 🗓️ (2026-11-20) كل جهة تُحسَب على فترتها هي (الفترة الواحدة = استعلام واحد كما كان)؛ والضمان «حسب المؤسّسة»: الفصلية من الفصل والباقي من الشهر
+    $data = []; $cache = []; $cnssPer = [];
+    $get = function (array $months, int $year) use ($db, &$cache) { $key = implode(',', $months) . '|' . $year; if (!isset($cache[$key])) $cache[$key] = duesBySchool($db, $months, $year); return $cache[$key]; };
+    $qIds = (($P['cfg']['cnss']['per'] ?? '') === 'auto') ? cnssQuarterlySchoolIds() : [];
     foreach (array_keys(duesKinds()) as $k) {
-        $c = $P['cfg'][$k] ?? $P; $key = implode(',', $c['months']) . '|' . $c['year'];
-        if (!isset($cache[$key])) $cache[$key] = duesBySchool($db, $c['months'], (int)$c['year']);
-        foreach ($cache[$key] as $sid => $v) { $data[$sid] = ($data[$sid] ?? []) + ['cnss' => 0, 'eoc' => 0, 'tax' => 0]; $data[$sid][$k] = (int)($v[$k] ?? 0); }
+        $c = $P['cfg'][$k] ?? $P;
+        foreach ($get($c['months'], (int)$c['year']) as $sid => $v) { if ($k === 'cnss' && in_array((int)$sid, $qIds, true)) continue; $data[$sid] = ($data[$sid] ?? []) + ['cnss' => 0, 'eoc' => 0, 'tax' => 0]; $data[$sid][$k] = (int)($v[$k] ?? 0); }
+        if ($k === 'cnss' && $qIds) foreach ($get($c['qcfg']['months'], (int)$c['qcfg']['year']) as $sid => $v) { if (!in_array((int)$sid, $qIds, true)) continue; $data[$sid] = ($data[$sid] ?? []) + ['cnss' => 0, 'eoc' => 0, 'tax' => 0]; $data[$sid]['cnss'] = (int)($v['cnss'] ?? 0); }
     }
     $ids = selectedReportSchoolIds(); if (empty($ids)) $ids = allActiveSchoolIdsCached();
     $ids = array_values(array_unique(array_map('intval', (array)$ids)));
@@ -1142,7 +1172,8 @@ function duesRows(PDO $db, array $P): array {
     foreach ($ids as $sid) {
         if ($sid <= 0) continue;
         $fr = $short[$sid][0] ?? (string)schoolNameById($sid, 'fr'); $ar = $short[$sid][1] ?? (string)schoolNameById($sid, 'ar');
-        $rows[] = ['sid' => $sid, 'fr' => $fr, 'ar' => $ar] + (($data[$sid] ?? []) + ['cnss' => 0, 'eoc' => 0, 'tax' => 0]);
+        $cq = in_array($sid, $qIds, true);   // ضمانها فصلي (بوضع «حسب المؤسّسة»)
+        $rows[] = ['sid' => $sid, 'fr' => $fr, 'ar' => $ar, 'cnss_q' => $cq] + (($data[$sid] ?? []) + ['cnss' => 0, 'eoc' => 0, 'tax' => 0]);
     }
     return $rows;
 }

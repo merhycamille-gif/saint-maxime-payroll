@@ -23,7 +23,7 @@ $currentPage = 'ecoles';
 $pageTitle = 'Écoles & établissements / المدارس والمؤسسات';
 $hideExportToolbar = true;
 $db = getDB();
-ensureEmployeeFlagColumns(); saEnsureCols(); ensureYearLockTable(); ensureEocHalfExtraColumns20261116();
+ensureEmployeeFlagColumns(); saEnsureCols(); ensureYearLockTable(); ensureEocHalfExtraColumns20261116(); ensureCnssQuarterlyColumn20261120();
 try { $db->query("SELECT caisse_number, email_sender_mode FROM schools LIMIT 1"); } catch (Throwable $e) {
     try { $db->exec("ALTER TABLE schools ADD COLUMN caisse_number VARCHAR(50) NULL"); } catch (Throwable $e2) {}
     try { $db->exec("ALTER TABLE schools ADD COLUMN email_sender_mode VARCHAR(10) NULL"); } catch (Throwable $e3) {}
@@ -102,6 +102,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'email_sender_mode' => (($_POST['email_sender_mode'] ?? 'program') === 'school') ? 'school' : 'program',
             // 🏛️½ (2026-11-16) نصف الأجر الإضافي بأوّل شهر الملاك: السنة الدراسية التي يبدأ منها (فارغ = مطفأ)
             'eoc_half_extra_from' => preg_match('/^\d{4}-\d{4}$/', (string)($_POST['eoc_half_extra_from'] ?? '')) ? (string)$_POST['eoc_half_extra_from'] : null,
+            // 🗓️ (2026-11-20) الضمان: شهري (0) أو فصلي (1) — يحكم عمود الضمان بتقرير «المتوجّبات حسب المدرسة»
+            'cnss_quarterly' => (($_POST['cnss_quarterly'] ?? '0') === '1') ? 1 : 0,
         ];
         if ($act === 'save_school' && $sid > 0) {
             $heOld = (string)$db->query("SELECT COALESCE(eoc_half_extra_from, '') FROM schools WHERE id = " . (int)$sid)->fetchColumn();
@@ -487,6 +489,18 @@ $kv = function (string $fr, string $ar, $val, bool $rtl = false) use ($miss) {
                     <div class="f"><label>E-mail <i>البريد</i></label><input class="form-control" name="email" type="email" value="<?= e((string)$s['email']) ?>"></div>
                     <div class="f"><label>E-mail expéditeur <i>المرسِل</i></label><select class="form-select" name="email_sender_mode"><option value="program" <?= ($s['email_sender_mode'] ?? 'program') !== 'school' ? 'selected' : '' ?>>Programme / إيميل البرنامج</option><option value="school" <?= ($s['email_sender_mode'] ?? '') === 'school' ? 'selected' : '' ?>>École / إيميل المدرسة</option></select></div>
                     <div class="f"><label>&nbsp;</label><label class="sc-check"><input type="checkbox" name="is_active" value="1" <?= $act ? 'checked' : '' ?>> Active <i>مفعّلة</i></label></div>
+                </div>
+            </div>
+            <?php // 🗓️ (2026-11-20 «كسارة - مكسيموس عبرا - العلاج الفيزيائي ضمان فصلي، الباقيين شهري») ?>
+            <div class="sc-sec"><h4>CNSS — périodicité de la déclaration <i>الضمان — التصريح شهري أو فصلي</i></h4>
+                <div class="sc-grid">
+                    <div class="f" style="grid-column:span 2"><label>Déclaration CNSS <i>تصريح الضمان</i></label>
+                        <select class="form-select" name="cnss_quarterly">
+                            <option value="0" <?= empty($s['cnss_quarterly']) ? 'selected' : '' ?>>Mensuelle / شهري</option>
+                            <option value="1" <?= !empty($s['cnss_quarterly']) ? 'selected' : '' ?>>Trimestrielle / فصلي</option>
+                        </select>
+                        <small style="display:block;color:var(--gray-600);margin-top:4px" dir="rtl">بتقرير «المتوجّبات حسب المدرسة»: المؤسّسة الفصلية بيطلع ضمانها عن الفصل، والشهرية عن الشهر.</small>
+                    </div>
                 </div>
             </div>
             <?php // 🏛️½ (2026-11-16 «بصفحة المدرسة وكمان بالأستاذ» + «خيار التاريخ… ببداية السنة الدراسية اللي بتكون ت1») ?>
