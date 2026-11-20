@@ -298,6 +298,7 @@ JS;
             . "html,body{margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}"
             . "body{font-family:Arial,Cairo,'Segoe UI',sans-serif;font-size:12pt;line-height:" . ($letter ? '1.6' : '1.3') . ";color:#111}"
             . ".pdf-doc{direction:" . ($rtl ? 'rtl' : 'ltr') . ";text-align:$al}"
+            . "table.pdf-t th .cur-head{display:block;font-weight:400}"   // 💱 (2026-11-20) سطر العملة تحت عنوان العمود بسطره كما على الشاشة (كان يلتصق: «TotalL.L»)
             . "table.pdf-t{width:auto;border-collapse:collapse;margin:3pt 0 6pt;table-layout:auto;page-break-inside:auto}"
             . "table.pdf-t.pdf-full{width:100%}"
             . "table.pdf-t thead{display:table-header-group}table.pdf-t tr{page-break-inside:avoid;break-inside:avoid}"

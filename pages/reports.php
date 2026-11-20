@@ -60,7 +60,7 @@ if ($report && in_array($report, $exportableReports, true)) {
         'school_year' => $schoolYear,
         'tax_sub' => $_GET['tax_sub'] ?? null,
         'per' => $_GET['per'] ?? null, 'q' => $_GET['q'] ?? null, 'rate' => $_GET['rate'] ?? null, 'kinds_set' => $_GET['kinds_set'] ?? null, // 🧾 المتوجّبات حسب المدرسة
-    ], fn($v) => $v !== null && $v !== '')) . (($report === 'dues_summary' && !empty($_GET['kinds']) && is_array($_GET['kinds'])) ? '&' . http_build_query(['kinds' => array_values($_GET['kinds'])]) : '') . empTypeQueryFrom($empTypeState); // ☑️ الفئات المشيّكة تصل للتصدير
+    ], fn($v) => $v !== null && $v !== '')) . (($report === 'dues_summary' && !empty($_GET['kinds']) && is_array($_GET['kinds'])) ? '&' . http_build_query(['kinds' => array_values($_GET['kinds'])]) : '') . ($report === 'dues_summary' ? (($__dq = http_build_query(array_filter(array_intersect_key($_GET, array_flip(preg_grep('/^(per|month|q|year|rate)_(cnss|eoc|tax)$/', array_keys($_GET)))), 'is_scalar'))) !== '' ? '&' . $__dq : '') : '') . empTypeQueryFrom($empTypeState); // ☑️ الفئات المشيّكة تصل للتصدير
     $colsQ = '';
     if (!empty($_GET['cols']) && is_array($_GET['cols'])) foreach ($_GET['cols'] as $c) $colsQ .= '&cols[]=' . urlencode($c);
     if (!empty($_GET['items']) && is_array($_GET['items'])) foreach ($_GET['items'] as $c) $colsQ .= '&items[]=' . urlencode($c); // بنود المجاميع السنوية المختارة
@@ -422,40 +422,49 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'dues_summary'):
-        /* 🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة — كملفّه «SR GLADIS CNSS»: المصدر الواحد duesParams/duesRows (report_helpers.php) */
-        $P = duesParams(); $dRows = duesRows($db, $P); $dK = $P['kinds']; $dLab = duesKinds(); $dMulti = count($dK) > 1;
-        $dUsd = fn($v) => nfc($v / $P['rate'], 2);
+        /* 🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة — كملفّه «SR GLADIS CNSS»: المصدر الواحد duesParams/duesRows (report_helpers.php)
+           🗓️💱 (2026-11-20) لكل جهة سطر خيارات: مشيّكة · شهري/فصلي · الشهر أو الفصل · السنة · سعر الدولار — وكل عمود يحمل فترته وسعره */
+        $P = duesParams(); $dRows = duesRows($db, $P); $dK = $P['kinds']; $dLab = duesKinds(); $dMulti = count($dK) > 1; $dC = $P['cfg'];
+        $dUsdK = fn($v, $kk) => $v / $dC[$kk]['rate'];
+        $dSub = fn($kk) => $dC[$kk]['label']['fr'] . ' / ' . $dC[$kk]['label']['ar'];
+        $dFr = ['cnss' => 'CNSS', 'eoc' => 'Caisse des indemnités', 'tax' => 'Impôt sur le revenu'];
     ?>
         <form method="GET" class="card no-print">
             <input type="hidden" name="report" value="dues_summary"><input type="hidden" name="kinds_set" value="1">
-            <div class="card-body form-row cols-3">
-                <div class="form-group mb-0"><label class="form-label">Période / الفترة</label><select name="per" class="form-select" onchange="var q=this.value==='quarter';document.getElementById('duesM').style.display=q?'none':'';document.getElementById('duesQ').style.display=q?'':'none'"><option value="month" <?= $P['per'] === 'month' ? 'selected' : '' ?>>Mois / شهر</option><option value="quarter" <?= $P['per'] === 'quarter' ? 'selected' : '' ?>>Trimestre / فصل</option></select></div>
-                <div class="form-group mb-0" id="duesM" style="<?= $P['per'] === 'quarter' ? 'display:none' : '' ?>"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$P['month']?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
-                <div class="form-group mb-0" id="duesQ" style="<?= $P['per'] === 'quarter' ? '' : 'display:none' ?>"><label class="form-label">Trimestre / الفصل</label><select name="q" class="form-select"><?php for($qq=1;$qq<=4;$qq++): ?><option value="<?=$qq?>" <?=$qq===$P['q']?'selected':''?>><?= $qq ?> — <?= e(monthName(($qq-1)*3+1)) ?> – <?= e(monthName(($qq-1)*3+3)) ?></option><?php endfor; ?></select></div>
-                <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= (int)$P['year'] ?>"></div>
-                <div class="form-group mb-0"><label class="form-label">1 $ = ? L.L / سعر الدولار</label><input type="text" name="rate" class="form-control" inputmode="decimal" value="<?= e(nfc($P['rate'], 2)) ?>"></div>
-                <div class="form-group mb-0"><label class="form-label">Afficher / شو بدّك تشوف</label>
-                    <div class="school-checks"><?php foreach ($dLab as $kk => $kl): ?><label class="chk"><input type="checkbox" name="kinds[]" value="<?= $kk ?>" <?= in_array($kk, $dK, true) ? 'checked' : '' ?>> <?= e($kl) ?></label><?php endforeach; ?></div></div>
-                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
-                <?php reportSchoolPicker(); ?>
+            <div class="card-body">
+                <div class="dues-opts" style="display:grid;grid-template-columns:minmax(150px,auto) minmax(150px,1fr) minmax(230px,1.5fr) minmax(96px,.6fr) minmax(120px,.9fr);gap:8px 10px;align-items:center;max-width:1040px">
+                    <div class="form-label mb-0">Afficher / شو بدّك تشوف</div><div class="form-label mb-0">Période / الفترة</div><div class="form-label mb-0">Mois ou trimestre / الشهر أو الفصل</div><div class="form-label mb-0">Année / السنة</div><div class="form-label mb-0">1 $ = ? L.L / سعر الدولار</div>
+                    <?php foreach ($dLab as $kk => $kl): $c = $dC[$kk]; ?>
+                        <label class="chk" style="font-weight:700;margin:0"><input type="checkbox" name="kinds[]" value="<?= $kk ?>" <?= in_array($kk, $dK, true) ? 'checked' : '' ?>> <?= e($kl) ?></label>
+                        <select name="per_<?= $kk ?>" class="form-select" onchange="var q=this.value==='quarter',r=this.parentNode;r.querySelector('[name=month_<?= $kk ?>]').style.display=q?'none':'';r.querySelector('[name=q_<?= $kk ?>]').style.display=q?'':'none'"><option value="month" <?= $c['per'] === 'month' ? 'selected' : '' ?>>Mensuel / شهري</option><option value="quarter" <?= $c['per'] === 'quarter' ? 'selected' : '' ?>>Trimestriel / فصلي</option></select>
+                        <div><select name="month_<?= $kk ?>" class="form-select" style="<?= $c['per'] === 'quarter' ? 'display:none' : '' ?>"><?php for ($m = 1; $m <= 12; $m++): ?><option value="<?= $m ?>" <?= $m === $c['month'] ? 'selected' : '' ?>><?= monthName($m) ?></option><?php endfor; ?></select><select name="q_<?= $kk ?>" class="form-select" style="<?= $c['per'] === 'quarter' ? '' : 'display:none' ?>"><?php for ($qq = 1; $qq <= 4; $qq++): ?><option value="<?= $qq ?>" <?= $qq === $c['q'] ? 'selected' : '' ?>><?= $qq ?> — <?= e(monthName(($qq - 1) * 3 + 1)) ?> – <?= e(monthName(($qq - 1) * 3 + 3)) ?></option><?php endfor; ?></select></div>
+                        <input type="number" name="year_<?= $kk ?>" class="form-control" value="<?= (int)$c['year'] ?>">
+                        <input type="text" name="rate_<?= $kk ?>" class="form-control" inputmode="decimal" value="<?= e(nfc($c['rate'], 2)) ?>">
+                    <?php endforeach; ?>
+                </div>
+                <div class="form-row cols-3" style="margin-top:10px">
+                    <div class="form-group mb-0"><button class="btn btn-primary w-100">Afficher / عرض</button></div>
+                    <?php reportSchoolPicker(); ?>
+                </div>
             </div>
         </form>
-        <?= docSheetStart('Montants dus par école', 'المتوجّبات حسب المدرسة', [$P['label']['fr'] . ' / ' . $P['label']['ar'], '1 $ = ' . nfc($P['rate'], 2) . ' L.L'], ['month' => $P['months'][0], 'year' => $P['year'], 'comp' => false]) ?>
+        <?php $dMeta = $P['uniform'] ? [$P['label']['fr'] . ' / ' . $P['label']['ar'], '1 $ = ' . nfc($P['rate'], 2) . ' L.L'] : array_map(fn($kk) => $dFr[$kk] . ' : ' . $dC[$kk]['label']['fr'] . ' · 1 $ = ' . nfc($dC[$kk]['rate'], 2) . ' L.L / ' . $dLab[$kk] . ' : ' . $dC[$kk]['label']['ar'] . " · \u{2066}1 $ = " . nfc($dC[$kk]['rate'], 2) . " L.L\u{2069}", $dK);   /* وجهان «FR / AR» لكل جهة — doclang يُظهر وجه لغة التقرير */ ?>
+        <?= docSheetStart('Montants dus par école', 'المتوجّبات حسب المدرسة', $dMeta, ['month' => $P['months'][0], 'year' => $P['year'], 'comp' => false]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><th>المدرسة</th><?php foreach ($dK as $kk): ?><th><?= e($dLab[$kk]) ?></th><th><?= e($dLab[$kk]) ?><br><small style="font-weight:400">$</small></th><?php endforeach; ?><?php if ($dMulti): ?><th style="background:#4338ca">المجموع</th><th style="background:#4338ca">المجموع<br><small style="font-weight:400">$</small></th><?php endif; ?></tr></thead>
+                    <thead><tr><th>#</th><th>المدرسة</th><?php foreach ($dK as $kk): ?><th><?= e($dLab[$kk]) ?><?php if (!$P['uniform']): ?><small style="font-weight:400;display:block"><?= e($dSub($kk)) ?></small><?php endif; ?></th><th><?= e($dLab[$kk]) ?><br><small style="font-weight:400">$</small><?php if (!$P['uniform']): ?><small style="font-weight:400;display:block" dir="ltr">1 $ = <?= e(nfc($dC[$kk]['rate'], 2)) ?></small><?php endif; ?></th><?php endforeach; ?><?php if ($dMulti): ?><th style="background:#4338ca">المجموع</th><th style="background:#4338ca">المجموع<br><small style="font-weight:400">$</small></th><?php endif; ?></tr></thead>
                     <tbody>
-                        <?php $dT = array_fill_keys($dK, 0); $dG = 0; $rn = 0;
-                        foreach ($dRows as $r): $rowT = 0; ?>
+                        <?php $dT = array_fill_keys($dK, 0); $dTu = array_fill_keys($dK, 0.0); $dG = 0; $dGu = 0.0; $rn = 0;
+                        foreach ($dRows as $r): $rowT = 0; $rowU = 0.0; ?>
                             <tr><td><?= ++$rn ?></td><td style="text-align:start;font-weight:600"><?= e($r['fr'] . ' / ' . $r['ar']) ?></td>
-                                <?php foreach ($dK as $kk): $v = (int)$r[$kk]; $dT[$kk] += $v; $rowT += $v; ?><td><?= $v ? nfc($v, 0) : '' ?></td><td><?= $v ? $dUsd($v) : '' ?></td><?php endforeach; ?>
-                                <?php if ($dMulti): $dG += $rowT; ?><td style="background:#eef2ff"><strong><?= $rowT ? nfc($rowT, 0) : '' ?></strong></td><td style="background:#eef2ff"><strong><?= $rowT ? $dUsd($rowT) : '' ?></strong></td><?php endif; ?>
+                                <?php foreach ($dK as $kk): $v = (int)$r[$kk]; $u = round($dUsdK($v, $kk), 2); $dT[$kk] += $v; $dTu[$kk] += $u; $rowT += $v; $rowU += $u; ?><td><?= $v ? nfc($v, 0) : '' ?></td><td><?= $v ? nfc($u, 2) : '' ?></td><?php endforeach; ?>
+                                <?php if ($dMulti): $dG += $rowT; $dGu += $rowU; ?><td style="background:#eef2ff"><strong><?= $rowT ? nfc($rowT, 0) : '' ?></strong></td><td style="background:#eef2ff"><strong><?= $rowT ? nfc($P['uniform'] ? $rowT / $P['rate'] : $rowU, 2) : '' ?></strong></td><?php endif; ?>
                             </tr>
                         <?php endforeach;
                         if (!$dK): ?><tr><td colspan="2" class="text-center text-muted">علِّم نوعاً واحداً على الأقلّ (الضمان / صندوق التعويضات / المالية)</td></tr>
                         <?php elseif ($dRows): ?>
                             <tr class="total-row" style="font-weight:700"><td colspan="2" style="text-align:start">Total / المجموع</td>
-                                <?php foreach ($dK as $kk): ?><td><?= nfc($dT[$kk], 0) ?></td><td><?= $dUsd($dT[$kk]) ?></td><?php endforeach; ?>
-                                <?php if ($dMulti): ?><td style="background:#eef2ff"><strong><?= nfc($dG, 0) ?></strong></td><td style="background:#eef2ff"><strong><?= $dUsd($dG) ?></strong></td><?php endif; ?>
+                                <?php foreach ($dK as $kk): ?><td><?= nfc($dT[$kk], 0) ?></td><td><?= nfc($P['uniform'] ? $dUsdK($dT[$kk], $kk) : $dTu[$kk], 2) ?></td><?php endforeach; ?>
+                                <?php if ($dMulti): ?><td style="background:#eef2ff"><strong><?= nfc($dG, 0) ?></strong></td><td style="background:#eef2ff"><strong><?= nfc($P['uniform'] ? $dG / $P['rate'] : $dGu, 2) ?></strong></td><?php endif; ?>
                             </tr>
                         <?php endif; ?>
                     </tbody>

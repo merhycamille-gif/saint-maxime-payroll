@@ -168,22 +168,25 @@ if ($report === 'monthly_summary') {
 
 } elseif ($report === 'dues_summary') {
     // 🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة — نفس مصدر الشاشة (duesParams + duesRows)
-    $P = duesParams(); $dRows = duesRows($db, $P); $dK = $P['kinds']; $dLab = duesKinds(); $dMulti = count($dK) > 1;
-    $rep = new ReportTable('المتوجّبات حسب المدرسة — ' . $P['label']['ar'] . ' — 1 $ = ' . nfc($P['rate'], 2) . ' ل.ل', false);
+    // 🗓️💱 (2026-11-20) لكل جهة فترتها وسعرها: رأس كل عمود يحملهما حين تختلف الجهات
+    $P = duesParams(); $dRows = duesRows($db, $P); $dK = $P['kinds']; $dLab = duesKinds(); $dMulti = count($dK) > 1; $dC = $P['cfg'];
+    $rep = new ReportTable('المتوجّبات حسب المدرسة' . ($P['uniform'] ? ' — ' . $P['label']['ar'] . ' — 1 $ = ' . nfc($P['rate'], 2) . ' ل.ل'
+        : ' — ' . implode(' · ', array_map(fn($kk) => $dLab[$kk] . ': ' . $dC[$kk]['label']['ar'] . ' (سعر الدولار ' . nfc($dC[$kk]['rate'], 2) . ')', $dK))), false);
     $rep->schoolHeader($school);
-    $head = ['#', 'المدرسة']; foreach ($dK as $kk) { $head[] = $dLab[$kk] . ' (ل.ل)'; $head[] = $dLab[$kk] . ' ($)'; }
+    $head = ['#', 'المدرسة'];
+    foreach ($dK as $kk) { $head[] = $dLab[$kk] . ' (ل.ل)' . ($P['uniform'] ? '' : ' — ' . $dC[$kk]['label']['ar']); $head[] = $dLab[$kk] . ' ($)' . ($P['uniform'] ? '' : ' — سعر الدولار ' . nfc($dC[$kk]['rate'], 2)); }   // صيغة عربية: «1 $ = …» تنقلب بورقة من اليمين
     if ($dMulti) { $head[] = 'المجموع (ل.ل)'; $head[] = 'المجموع ($)'; }
     $rep->head($head);
-    $dT = array_fill_keys($dK, 0); $dG = 0; $rn = 0;
+    $dT = array_fill_keys($dK, 0); $dTu = array_fill_keys($dK, 0.0); $dG = 0; $dGu = 0.0; $rn = 0;
     foreach ($dRows as $r) {
-        $row = [++$rn, $r['fr'] . ' / ' . $r['ar']]; $rowT = 0;
-        foreach ($dK as $kk) { $v = (int)$r[$kk]; $dT[$kk] += $v; $rowT += $v; $row[] = $v ?: ''; $row[] = $v ? round($v / $P['rate'], 2) : ''; }
-        if ($dMulti) { $dG += $rowT; $row[] = $rowT ?: ''; $row[] = $rowT ? round($rowT / $P['rate'], 2) : ''; }
+        $row = [++$rn, $r['fr'] . ' / ' . $r['ar']]; $rowT = 0; $rowU = 0.0;
+        foreach ($dK as $kk) { $v = (int)$r[$kk]; $u = round($v / $dC[$kk]['rate'], 2); $dT[$kk] += $v; $dTu[$kk] += $u; $rowT += $v; $rowU += $u; $row[] = $v ?: ''; $row[] = $v ? $u : ''; }
+        if ($dMulti) { $dG += $rowT; $dGu += $rowU; $row[] = $rowT ?: ''; $row[] = $rowT ? round($P['uniform'] ? $rowT / $P['rate'] : $rowU, 2) : ''; }
         $rep->row($row);
     }
     if ($dRows && $dK) {
-        $row = ['', 'المجموع']; foreach ($dK as $kk) { $row[] = $dT[$kk]; $row[] = round($dT[$kk] / $P['rate'], 2); }
-        if ($dMulti) { $row[] = $dG; $row[] = round($dG / $P['rate'], 2); }
+        $row = ['', 'المجموع']; foreach ($dK as $kk) { $row[] = $dT[$kk]; $row[] = round($P['uniform'] ? $dT[$kk] / $dC[$kk]['rate'] : $dTu[$kk], 2); }
+        if ($dMulti) { $row[] = $dG; $row[] = round($P['uniform'] ? $dG / $P['rate'] : $dGu, 2); }
         $rep->totalRow($row);
     }
 

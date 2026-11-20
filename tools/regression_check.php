@@ -12165,6 +12165,30 @@ try {
     check('🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة (كملفّه SR GLADIS CNSS): شهر/فصل · ضمان/صندوق/مالية بالتشييك · سعر الدولار — والأرقام = الكشوف الشهرية الثلاثة (الضمان = الباقي المتوجب للصندوق) · شاشة + إكسل + بلاطة + فرنسي',
         $okSame && $okShape && $okQ && $okPick && $okXls && $okSrc, 'same=' . (int)$okSame . ' shape=' . (int)$okShape . ' q=' . (int)$okQ . ' pick=' . (int)$okPick . ' xls=' . (int)$okXls . ' src=' . (int)$okSrc . " cnss=$cn rest=$restC eoc=$eo tax=$tx/$taxSum");
 } catch (Throwable $e) { check('🧾🏫 (2026-11-18) المتوجّبات حسب المدرسة (كملفّه SR GLADIS CNSS)', false, $e->getMessage()); }
+/* 🗓️💱 (2026-11-20 «بدّي يكون عندي خيار حطّ فصلي وشهري بنفس الوقت… شهري عمود ضمان وعمود تاني فصلي للمالية أو الصندوق» + «كل عمود حطّ سعر صرف الدولار، يمكن يكون مختلف»)
+ *    لكل جهة فترتها وسعرها: per_<k>/month_<k>/q_<k>/year_<k>/rate_<k> — والروابط القديمة (per/month/q/rate العامّة) تعطي نفس التقرير بالحرف. */
+try {
+    $numD = fn($x) => (float)str_replace(',', '.', preg_replace('/,(?=\d{3}(\D|$))/', '', preg_replace('/[^\d,.-]/', '', (string)$x)));
+    $mixQ = ['report' => 'dues_summary', 'kinds_set' => 1, 'kinds' => ['cnss', 'eoc', 'tax'], 'per_cnss' => 'month', 'month_cnss' => 10, 'year_cnss' => 2026, 'rate_cnss' => '89500',
+             'per_eoc' => 'quarter', 'q_eoc' => 4, 'year_eoc' => 2026, 'rate_eoc' => '89000', 'per_tax' => 'quarter', 'q_tax' => 4, 'year_tax' => 2026, 'rate_tax' => '90000', 'schools' => [3]];
+    $hX = renderPage('pages/reports.php', $mixQ, ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $tX = $cellsD($hX); $rX = $tX[1] ?? [];
+    $cnX = (int)preg_replace('/[^\d-]/', '', $rX[2] ?? ''); $eoX = (int)preg_replace('/[^\d-]/', '', $rX[4] ?? ''); $txX = (int)preg_replace('/[^\d-]/', '', $rX[6] ?? '');
+    $txQ = $qD('ms.income_tax_lbp', ' AND e.tax_subject = 1', '10,11,12');
+    $okMixNum = count($rX) === 10 && $cnX === $cn && $cnX > 0 && $eoX === $eoQ && $eoX > $eo && $txX === $txQ && (int)preg_replace('/[^\d-]/', '', $rX[8] ?? '') === $cnX + $eoX + $txX;
+    $okMixUsd = abs($numD($rX[3] ?? '') - round($cnX / 89500, 2)) < 0.011 && abs($numD($rX[5] ?? '') - round($eoX / 89000, 2)) < 0.011 && abs($numD($rX[7] ?? '') - round($txX / 90000, 2)) < 0.011
+        && abs($numD($rX[9] ?? '') - (round($cnX / 89500, 2) + round($eoX / 89000, 2) + round($txX / 90000, 2))) < 0.011;
+    $okMixHead = strpos($hX, '1 $ = 89,500') !== false && strpos($hX, '1 $ = 89,000') !== false && strpos($hX, '1 $ = 90,000') !== false && strpos($hX, 'الفصل 4 2026') !== false
+        && strpos($hX, 'name="per_tax"') !== false && strpos($hX, 'name="rate_eoc"') !== false && stripos($hX, 'Fatal error') === false;
+    $xX = $sheet184(renderPage('pages/reports_export.php', $mixQ + ['format' => 'xlsx'], ['extra', 'aide'], [3], 'lbp', '2026-2027', $PROJ . '/tools/_rdues2.xlsx'));
+    $okMixXls = strpos($xX, (string)$cnX) !== false && strpos($xX, (string)$eoX) !== false && strpos($xX, 'سعر الدولار 89,000') !== false;
+    $rhS = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+    $okMixSrc = strpos($rhS, "\$_GET['per_' . \$k]") !== false && strpos($rhS, "'uniform' => \$uniform") !== false
+        && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "preg_grep('/^(per|month|q|year|rate)_(cnss|eoc|tax)\$/'") !== false;
+    check('🗓️💱 (2026-11-20) المتوجّبات حسب المدرسة: لكل جهة فترتها (شهري/فصلي) وسعر صرفها بنفس التقرير — الضمان شهري = الكشف الشهري، الصندوق/المالية فصلي = مجموع أشهره، وكل عمود دولاره بسعره · شاشة + إكسل + رابط التصدير',
+        $okMixNum && $okMixUsd && $okMixHead && $okMixXls && $okMixSrc, 'num=' . (int)$okMixNum . ' usd=' . (int)$okMixUsd . ' head=' . (int)$okMixHead . ' xls=' . (int)$okMixXls . ' src=' . (int)$okMixSrc . " cnss=$cnX eoc=$eoX tax=$txX/$txQ");
+} catch (Throwable $e) { check('🗓️💱 (2026-11-20) المتوجّبات حسب المدرسة: لكل جهة فترتها وسعرها', false, $e->getMessage()); }
+
 
 /* ⏱️ قياس الوقت (اختياري: REG_TIMING=1) */
 if (getenv('REG_TIMING')) {
