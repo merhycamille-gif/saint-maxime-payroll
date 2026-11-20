@@ -217,3 +217,23 @@ check('🌐 محرّك Chromium: ملف المحرّك + التحويل التل
     && strpos($cr247, "getSetting('pdf_service_pass', '')") !== false && strpos((string)@file_get_contents($PROJ . '/pages/email_settings.php'), "setSetting('pdf_service_pass', ") !== false
     && strpos((string)@file_get_contents($PROJ . '/.gitignore'), 'config/pdf_service.php') !== false
     && strpos($en247, "'widest' => (float)(\$widestMm ?? 0)") !== false);
+
+/* 🖨️📧 (2026-11-20 «البطاقة السنوية: وقت بطبعها دغري على البرنتر ممتازة، بس أبعتها إيميل من البرنامج أو أحفظها عالكمبيوتر شوف كيف بتطلع»)
+ *    الإيميل / «احفظ عالكمبيوتر» / واتساب بالبطاقة السنوية كانت **صورة** للشاشة داخل PDF (html-to-image، 1.5MB، حروف غير حادّة).
+ *    الآن ورقة الطباعة نفسها: pdf-save.js printPagePdf يبعث الصفحة (كل قواعد CSS مع @media print/@page + --pz من msaFitPrintZoom) إلى
+ *    pages/print_page_pdf.php ⇒ MsaChromePdf::printPagePdf (Chromium بوسط الطباعة، preferCssPageSize، بلا سكربت ولا تحميل خارجي).
+ *    مقيس: 641 كلمة بنفس مواضع طباعة المتصفّح (فرق ثابت 0.75pt)، 56KB؛ الجماعي حتى 400 بطاقة (359 = 47 ث). أي عطل ⇒ التصوير القديم. تصميم البطاقة لم يُمسّ. */
+$ps1120 = (string)@file_get_contents($PROJ . '/assets/js/pdf-save.js');
+$pp1120 = (string)@file_get_contents($PROJ . '/pages/print_page_pdf.php');
+check('🖨️📧 البطاقة السنوية بالإيميل/الحفظ/الواتساب = ورقة الطباعة نفسها من المحرّك (لا صورة) + رجوع للتصوير عند العطل + الجماعي حتى 400 + أمان الصفحة المرسَلة',
+    strpos($ps1120, "if (cards.length && landscape) return printPagePdf().then(") !== false
+    && strpos($ps1120, "if (tooMany) throw new Error('too many cards'); return shoot(); });") !== false
+    && strpos($ps1120, "try { if (window.msaFitPrintZoom) window.msaFitPrintZoom(); } catch (eFit) {}") !== false && strpos($ps1120, "function printPagePdf() {") !== false
+    && strpos($ps1120, "'pages/print_page_pdf.php'") !== false
+    && strpos($ps1120, "cardsN > 40 && !(document.querySelector('.salary-slip') && cardsN <= 400)") !== false
+    && strpos($pp1120, "requireLogin();") !== false && strpos($pp1120, "!verifyCsrf(\$_POST['csrf'] ?? '')") !== false
+    && strpos($pp1120, 'MsaChromePdf::printPagePdf($html)') !== false
+    && strpos($cr247, 'public static function printPagePdf(string $doc): string') !== false
+    && strpos($cr247, "'preferCssPageSize' => 'true'") !== false
+    && strpos($cr247, '#<(script|iframe|object|embed|noscript|template)') !== false
+    && strpos($cr247, '(?!data:)[^)]*') !== false);

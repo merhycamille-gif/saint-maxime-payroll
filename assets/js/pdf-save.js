@@ -59,6 +59,7 @@
 
     function fileName() {
         var n = document.querySelector('.slip-emp-name .slip-pname');
+        if (document.querySelectorAll('.salary-slip').length > 1) return 'releves_annuels.pdf';   // طباعة جماعية: لا اسم أوّل أستاذ على ملف الكلّ
         var base = document.querySelector('.salary-slip') ? 'releve_annuel' : 'bulletin';
         var who = n ? '_' + n.textContent.trim().replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) : '';
         return base + who + '.pdf';
@@ -350,8 +351,12 @@
         var cards = document.querySelectorAll('.salary-slip');
         var landscape = cards.length > 0;
         if (!cards.length) cards = document.querySelectorAll('.payslip-card');
-        if (cards.length > 40) return Promise.reject(new Error('too many cards'));
-        if (cards.length) return loadLibs().then(function () { step('buildPdf'); return buildPdf(cards, landscape); }).then(function (doc) { return { doc: doc, name: fileName() }; });
+        var tooMany = cards.length > 40;   // حدّ التصوير القديم (ذاكرة المتصفّح)؛ ورقة الطباعة من الخادم تتحمّل الطباعة الجماعية (حتى 400 بطاقة)
+        if (tooMany && !(landscape && cards.length <= 400)) return Promise.reject(new Error('too many cards'));
+        // 🖨️📧 (2026-11-20) البطاقة السنوية: ورقة الطباعة نفسها من محرّك الطباعة (نصّ حقيقي، طبق ما يطلع على البرنتر)؛ أي عطل ⇒ التصوير القديم كما كان
+        var shoot = function () { return loadLibs().then(function () { step('buildPdf'); return buildPdf(cards, landscape); }).then(function (doc) { return { doc: doc, name: fileName() }; }); };
+        if (cards.length && landscape) return printPagePdf().then(function (blob) { step('print-page pdf ' + blob.size); return { blob: blob, name: fileName() }; }).catch(function (e) { step('print-page FAIL: ' + (e && (e.message || e))); if (tooMany) throw new Error('too many cards'); return shoot(); });
+        if (cards.length) return shoot();
         // 🖨️ (2026-10-11) أي صفحة ليست قسائم ولا نموذجاً طبق الأصل: PDF جاهز من محرّك الطباعة على الخادم (export.js msaServerPdf)
         if (window.msaServerPdf && !document.querySelector('.ofs, .xls-sheet')) return window.msaServerPdf().then(function (r) { step('server pdf ' + r.name); return { blob: r.blob, name: r.name }; });
         return loadLibs().then(function () { return buildGenericPdf(genericArea()); }).then(function (doc) { return { doc: doc, name: genericName() }; });
@@ -364,7 +369,7 @@
         var cardsN = document.querySelectorAll('.salary-slip, .payslip-card').length;
         // مجموعة ضخمة (طباعة الكل لمئات الأساتذة): التوليد الفوري يستغرق دقائق طويلة
         // ويستهلك ذاكرة هائلة — حوار طباعة المتصفح أنسب لها (سريع ومضبوط)
-        if (cardsN > 40) { window.print(); return; }
+        if (cardsN > 40 && !(document.querySelector('.salary-slip') && cardsN <= 400)) { window.print(); return; }   // البطاقات السنوية الجماعية: ورقة الطباعة من الخادم (وعند الفشل ⇒ حوار المتصفّح كما كان)
         var old = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.textContent = '⏳ عم نجهّز الملف...'; }
         buildAnyPdf()
@@ -375,6 +380,35 @@
                 window.print(); // أي فشل → حوار المتصفح كما كان (لا يُترك المستخدم بلا شيء)
             });
     };
+    // ===== 🖨️ ورقة الطباعة نفسها ⇒ PDF من الخادم (pages/print_page_pdf.php ⇒ MsaChromePdf::printPagePdf) =====
+    // الصفحة تُرسَل كما هي: كل قواعد CSS (ومنها @media print و@page) + البطاقات بمقاس --pz المحسوب بنفس دالّة «قبل الطباعة».
+    function printPagePdf() {
+        try { if (window.msaFitPrintZoom) window.msaFitPrintZoom(); } catch (eFit) {}
+        var css = '';
+        for (var s = 0; s < document.styleSheets.length; s++) {
+            var rules; try { rules = document.styleSheets[s].cssRules; } catch (e) { continue; }   // ورقة من موقع آخر (أيقونات) — لا تُطبع أصلاً
+            if (!rules) continue;
+            for (var r = 0; r < rules.length; r++) { if (rules[r].type === 5 || rules[r].type === 3) continue; css += rules[r].cssText + '\n'; }   // بلا @font-face/@import: الخطّ يرفقه الخادم
+        }
+        var root = document.documentElement.cloneNode(true);
+        Array.prototype.forEach.call(root.querySelectorAll('script, style, link, noscript, iframe, template, #ppShare, .no-print, input[type=hidden]'), function (n) { n.remove(); });
+        // الصور (شعار…) تُضمَّن داخل المستند: الخادم لا يحمّل شيئاً من الخارج
+        var live = document.querySelectorAll('.salary-slip img'), cl = root.querySelectorAll('.salary-slip img');
+        for (var i = 0; i < cl.length; i++) {
+            try { var im = live[i], cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight; cv.getContext('2d').drawImage(im, 0, 0); cl[i].setAttribute('src', cv.toDataURL('image/png')); cl[i].removeAttribute('srcset'); }
+            catch (eI) { cl[i].remove(); }
+        }
+        Array.prototype.forEach.call(root.querySelectorAll('img:not([src^="data:"])'), function (n) { n.remove(); });
+        var attrs = function (el) { var o = ''; for (var a = 0; a < el.attributes.length; a++) { var at = el.attributes[a]; if (/^on/i.test(at.name)) continue; o += ' ' + at.name + '="' + String(at.value).replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"'; } return o; };
+        var body = root.querySelector('body');
+        var doc = '<!DOCTYPE html><html' + attrs(document.documentElement) + '><head><title>' + fileName().replace(/[<>&]/g, '') + '</title><style>' + css.replace(/<\/style/gi, '') + '</style></head>' + body.outerHTML + '</html>';
+        var fd = new FormData(); fd.append('csrf', window.CSRF_TOKEN || ''); fd.append('html', new Blob([doc], { type: 'text/html' }), 'page.html');
+        step('print-page post ' + Math.round(doc.length / 1024) + 'KB');
+        return fetch((window.BASE_URL || '') + 'pages/print_page_pdf.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.blob();
+        }).then(function (b) { if (!b || b.size < 1000 || !/pdf/i.test(b.type)) throw new Error('not a pdf'); return b; });
+    }
     function buildPdf(cards, landscape) {
         var cur = curtain('⏳ عم نجهّز ملف الـPDF... لحظة');
         try { if (window.msaFitPrintZoom) window.msaFitPrintZoom(); if (window.msaFitDocTables) window.msaFitDocTables(); } catch (eFit) {} var restore = flipPrintRules();

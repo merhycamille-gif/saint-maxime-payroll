@@ -159,6 +159,27 @@ class MsaChromePdf
         return self::rawPdf($doc, ['paperWidth' => '210mm', 'paperHeight' => '297mm', 'marginTop' => '0', 'marginBottom' => '0', 'marginLeft' => '0', 'marginRight' => '0']);
     }
 
+    /**
+     * 🖨️📧 (2026-11-20 «وقت بطبعها دغري على البرنتر ممتازة، بس أبعتها إيميل أو أحفظها شوف كيف بتطلع») ورقة الطباعة نفسها ⇒ PDF:
+     * المتصفّح يبعث الصفحة كما هي جاهزة للطباعة (HTML + كل قواعد CSS ومنها @media print و@page + مقاس --pz المحسوب كما قبل الطباعة)،
+     * وChromium يرسمها بوسط الطباعة ⇒ نفس ما يطلع على البرنتر (نصّ حقيقي لا صورة). تُستعمل للبطاقة السنوية المجمّدة: لا تحضير ولا تغيير بالتصميم.
+     * أمان: لا سكربت ولا إطارات ولا أي تحميل من خارج المستند (الصور data: فقط). يرمي استثناءً عند الفشل (المتصفّح يرجع للطريقة القديمة).
+     */
+    public static function printPagePdf(string $doc): string
+    {
+        $doc = preg_replace('#<(script|iframe|object|embed|noscript|template)\b[^>]*>.*?</\1\s*>#isu', '', $doc) ?? $doc;
+        $doc = preg_replace('#<(script|iframe|object|embed|link|base|meta)\b[^>]*>#iu', '', $doc) ?? $doc;
+        $doc = preg_replace('#\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)#iu', '', $doc) ?? $doc;
+        $doc = preg_replace('#@import[^;]*;#iu', '', $doc) ?? $doc;
+        $doc = preg_replace('#url\(\s*(["\']?)(?!data:)[^)]*\)#iu', 'none', $doc) ?? $doc;                          // لا خلفيات/خطوط من عناوين خارجية
+        $doc = preg_replace('#(<(?:img|source|video|audio)\b[^>]*?\s)(src|srcset)\s*=\s*(["\'])(?!data:)[^"\']*\3#iu', '$1', $doc) ?? $doc;
+        if (stripos($doc, '<head') === false || stripos($doc, '<body') === false) throw new RuntimeException('bad document');
+        $doc = preg_replace('#<head[^>]*>#i', '$0<meta charset="utf-8"><style>' . self::fontCss() . '</style>', $doc, 1);
+        if (stripos($doc, '<!doctype') === false) $doc = '<!DOCTYPE html>' . $doc;
+        // المقاس والهوامش من @page بالصفحة نفسها (البطاقة: A4 أفقي 4mm) — كما يفعل حوار الطباعة
+        return self::rawPdf($doc, ['preferCssPageSize' => 'true', 'paperWidth' => '297mm', 'paperHeight' => '210mm', 'marginTop' => '4mm', 'marginBottom' => '4mm', 'marginLeft' => '4mm', 'marginRight' => '4mm', 'waitDelay' => '400ms']);
+    }
+
     /** مستند HTML كامل كما هو ⇒ PDF عبر Gotenberg/Chromium (الخطوط مرفقة) — بلا تذييل ولا تحضير */
     public static function rawPdf(string $doc, array $opts = []): string
     {
