@@ -479,13 +479,14 @@
     //    خيارات: 🏫 المدرسة (الافتراضي إن كان إيميلها مكتوباً بصفحة المدارس) · 👨‍🏫 الأستاذ المعروض (إن كان له إيميل بملفه) · ✍️ إيميل آخر
     function msaRecipHtml(inputId, to) {
         var sch = window.MSA_SCHOOL_EMAIL || '', tch = window.MSA_TEACHER_EMAIL || '';
-        var def = sch ? 'school' : (tch ? 'teacher' : 'other');
-        var val = def === 'school' ? sch : (def === 'teacher' ? tch : (to || ''));
+        var hqMoi = !!window.MSA_IS_HQ && !!window.MSA_HQ_EMAIL;   // 🏛️ (2026-11-23) حساب الرئاسة: إيميلها هي معبّأ ومختار
+        var def = hqMoi ? 'hq' : (sch ? 'school' : (tch ? 'teacher' : 'other'));
+        var val = def === 'hq' ? window.MSA_HQ_EMAIL : (def === 'school' ? sch : (def === 'teacher' ? tch : (to || '')));
         var h = '<div class="msaRecip" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;font-size:14px">';
         if (sch) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="school" data-mail="' + escH(sch) + '"' + (def === 'school' ? ' checked' : '') + '> 🏫 <b>للمدرسة</b> ' + escH(window.MSA_SCHOOL_NAME || '') + ' <span dir="ltr" style="color:#64748b">‹' + escH(sch) + '›</span></label>';
         if (tch) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="teacher" data-mail="' + escH(tch) + '"' + (def === 'teacher' ? ' checked' : '') + '> 👨‍🏫 <b>للأستاذ</b> ' + escH(window.MSA_TEACHER_NAME || '') + ' <span dir="ltr" style="color:#64748b">‹' + escH(tch) + '›</span></label>';
         else if (window.MSA_TEACHER_NAME) h += '<div style="color:#92400e;font-size:12.5px">👨‍🏫 الأستاذ ' + escH(window.MSA_TEACHER_NAME) + ' ما إله إيميل بملفه — اكتبه بملفه (تبويب العنوان) ليظهر هون.</div>';
-        if (window.MSA_HQ_EMAIL) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="hq" data-mail="' + escH(window.MSA_HQ_EMAIL) + '"> 🏛️ <b>' + escH(window.MSA_HQ_NAME || 'الرئاسة العامة') + '</b> <span dir="ltr" style="color:#64748b">' + escH(window.MSA_HQ_EMAIL) + '</span></label>';   // 🏛️ (2026-11-20)
+        if (window.MSA_HQ_EMAIL) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="hq" data-mail="' + escH(window.MSA_HQ_EMAIL) + '"' + (def === 'hq' ? ' checked' : '') + '> 🏛️ <b>' + escH(window.MSA_HQ_NAME || 'الرئاسة العامة') + '</b> <span dir="ltr" style="color:#64748b">' + escH(window.MSA_HQ_EMAIL) + '</span></label>';   // 🏛️ (2026-11-20)
         h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="other"' + (def === 'other' ? ' checked' : '') + '> ✍️ <b>إيميل آخر</b></label></div>';
         h += '<input type="email" id="' + inputId + '" class="form-control" dir="ltr" value="' + escH(val) + '" placeholder="name@example.com" style="margin-bottom:8px">';
         return h;
@@ -658,7 +659,7 @@
             '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:6px"><i class="fab fa-whatsapp"></i> إرسال عبر واتساب / Envoyer par WhatsApp</div>'
             + '<div style="font-size:13.5px;color:#475569;line-height:1.8;margin-bottom:10px">واتساب ما بيقبل إرفاق ملف من الرابط. الطريقة: <b>١</b> نزّل الملف PDF (بينزل عالكمبيوتر) ← <b>٢</b> افتح المحادثة ← ارفق الملف من واتساب (📎).</div>'
             + '<label style="display:block;font-weight:700;margin-bottom:4px">رقم الواتساب / Numéro</label>'
-            + '<input type="tel" id="ppWaNum" class="form-control" dir="ltr" value="' + escH(phone || '') + '" placeholder="03 123 456 أو 961…" style="margin-bottom:10px">'
+            + '<input type="tel" id="ppWaNum" class="form-control" dir="ltr" value="' + escH((window.MSA_IS_HQ && window.MSA_HQ_WA) ? window.MSA_HQ_WA : (phone || '')) + '" placeholder="03 123 456 أو 961…" style="margin-bottom:10px">'
             + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
             + '<button type="button" id="ppWaPdf" class="btn btn-primary" style="font-weight:700">💾 ١ — نزّل الملف PDF</button>'
             + '<a id="ppWaOpen" class="btn" target="_blank" rel="noopener" style="background:#25D366;color:#fff;font-weight:700" href="#"><i class="fab fa-whatsapp"></i> ٢ — افتح المحادثة</a>'
@@ -704,7 +705,7 @@
                 '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:6px"><i class="fab fa-whatsapp"></i> إرسال عبر واتساب / Envoyer par WhatsApp</div>'
                 + '<div style="font-size:13.5px;color:#475569;line-height:1.8;margin-bottom:10px">واتساب ما بيقبل إرفاق ملف من الرابط. الطريقة: <b>١</b> افتح النموذج واحفظه PDF، <b>٢</b> افتح المحادثة وارفق الملف من 📎.</div>'
                 + '<label style="display:block;font-weight:700;margin-bottom:4px">رقم الواتساب / Numéro</label>'
-                + '<input type="tel" id="ppWaNum" class="form-control" dir="ltr" value="' + escH(o.phone || '') + '" placeholder="03 123 456 أو 961…" style="margin-bottom:10px">'
+                + '<input type="tel" id="ppWaNum" class="form-control" dir="ltr" value="' + escH((window.MSA_IS_HQ && window.MSA_HQ_WA) ? window.MSA_HQ_WA : (o.phone || '')) + '" placeholder="03 123 456 أو 961…" style="margin-bottom:10px">'
                 + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
                 + '<a class="btn btn-primary" target="_blank" rel="noopener" style="font-weight:700" href="' + escH(o.pdf) + '">💾 ١ — افتح النموذج واحفظه PDF</a>'
                 + '<a id="ppWaOpen" class="btn" target="_blank" rel="noopener" style="background:#25D366;color:#fff;font-weight:700" href="#"><i class="fab fa-whatsapp"></i> ٢ — افتح المحادثة</a>'

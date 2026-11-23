@@ -24,9 +24,9 @@
           $msaWaSch = trim((string)(($msaMailSch['mobile_phone'] ?? '') ?: ($msaMailSch['phone'] ?? ''))); if (!msaWaIsMobile($msaWaSch)) { $msaWaSch = trim((string)($msaMailSch['phone'] ?? '')); if (!msaWaIsMobile($msaWaSch)) $msaWaSch = ''; }   // خلوي فقط (الأرضي لا يستقبل واتساب)
           if ($msaMailEid > 0) { $msaWaRow = getDB()->query("SELECT phone1, phone2 FROM employees WHERE id = $msaMailEid AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC); foreach ([$msaWaRow['phone1'] ?? '', $msaWaRow['phone2'] ?? ''] as $msaWaP) if ($msaWaT === '' && msaWaIsMobile((string)$msaWaP)) $msaWaT = trim((string)$msaWaP); } } } catch (Throwable $t) {} ?>
 <?php // 🏛️ (2026-11-20) الرئاسة العامة: اسمها ورقمها وإيميلها محفوظة بالإعدادات ⇒ خيار جاهز بنافذتَي الواتساب والإيميل
-      $msaHq = ['name' => '', 'wa' => '', 'email' => '']; try { if (function_exists('canEdit') && canEdit()) { $msaHq = ['name' => trim((string)getSetting('hq_contact_name', '')), 'wa' => trim((string)getSetting('hq_contact_whatsapp', '')), 'email' => trim((string)getSetting('hq_contact_email', ''))];
+      $msaHq = ['name' => '', 'wa' => '', 'email' => '']; try { if (function_exists('canEdit') && (canEdit() || (function_exists('viewerIsHq') && viewerIsHq()))) { $msaHq = ['name' => trim((string)getSetting('hq_contact_name', '')), 'wa' => trim((string)getSetting('hq_contact_whatsapp', '')), 'email' => trim((string)getSetting('hq_contact_email', ''))];
           if (!filter_var($msaHq['email'], FILTER_VALIDATE_EMAIL)) $msaHq['email'] = ''; if ($msaHq['name'] === '') $msaHq['name'] = 'الرئاسة العامة'; } } catch (Throwable $t) {} ?>
-<script>window.MSA_HQ_NAME = <?= json_encode($msaHq['name']) ?>; window.MSA_HQ_WA = <?= json_encode($msaHq['wa']) ?>; window.MSA_HQ_EMAIL = <?= json_encode($msaHq['email']) ?>;</script>
+<script>window.MSA_HQ_NAME = <?= json_encode($msaHq['name']) ?>; window.MSA_HQ_WA = <?= json_encode($msaHq['wa']) ?>; window.MSA_HQ_EMAIL = <?= json_encode($msaHq['email']) ?>; window.MSA_IS_HQ = <?= (function_exists('viewerIsHq') && viewerIsHq()) ? 'true' : 'false' ?>;</script><?php /* 🏛️📤 (2026-11-23 «بتكبس إيميل بيطلع إيميل الريّسة، بتكبس واتساب بيطلع رقم الريّسة») حساب الرئاسة: جهتها هي المعبّأة تلقائياً */ ?>
 <script>window.MSA_WA_DIRECT = <?= json_encode($msaWaOn) ?>; window.MSA_WA_FROM = <?= json_encode($msaWaFrom) ?>; window.MSA_SCHOOL_WA = <?= json_encode($msaWaSch) ?>; window.MSA_TEACHER_WA = <?= json_encode($msaWaT) ?>;</script>
 <script>window.MSA_SCHOOL_EMAIL = <?= json_encode($msaMailSchEmail) ?>; window.MSA_SCHOOL_NAME = <?= json_encode((string)(($msaMailSch['name_ar'] ?? '') ?: ($msaMailSch['name_fr'] ?? ''))) ?>; window.MSA_TEACHER_EMAIL = <?= json_encode($msaMailTEmail) ?>; window.MSA_TEACHER_NAME = <?= json_encode($msaMailTName) ?>;</script>
 <script src="<?= BASE_URL ?>assets/js/doclang.js?v=<?= @filemtime(__DIR__ . '/../assets/js/doclang.js') ?: '1' ?>"></script>
@@ -42,6 +42,7 @@
 <script>
 // 🔎🚀 الفحص الشامل الدوري بنبض خلفي: بعد ظهور الصفحة بثانيتين، ثم كل 5 ثوانٍ ما دامت الجولة لم تكتمل والصفحة مفتوحة ومرئية
 (function () {
+  <?php if (function_exists('isViewer') && isViewer()): /* 👁️ 2026-11-23 حسابات القراءة لا ترسل النبض: كان يُرفض (302) فيترك لها رسالة «قراءة فقط: لا تملك صلاحية…» على الصفحة التالية بلا سبب */ ?>return;<?php endif; ?>
   function tick() {
     if (document.hidden || document.prerendering) { setTimeout(tick, 5000); return; }
     fetch(window.BASE_URL + 'ajax_tick.php', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; })
