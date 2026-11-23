@@ -615,6 +615,7 @@
         waShareOld(title, getPdf, fallback);
     }
     function waShareOld(title, getPdf, fallback) {
+        if (window.MSA_IS_HQ) { fallback(); return; }   // 🏛️ (2026-11-23) حساب الرئاسة: نافذة الرقم (رقمها هي معبّأ، ويتغيّر) + تنزيل الملف — لا نافذة «مشاركة» الجهاز
         if (!canSharePdf()) { fallback(); return; }
         var m = shareModal(
             '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:10px"><i class="fab fa-whatsapp"></i> إرسال عبر واتساب / Envoyer par WhatsApp</div>'
