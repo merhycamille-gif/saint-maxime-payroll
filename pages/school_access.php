@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = (string)($_POST['password'] ?? '');
         $active = isset($_POST['is_active']) ? 1 : 0;
         $selP = $_POST['allowed'] ?? []; if (!is_array($selP)) $selP = [];
-        $allowedPages = implode(',', array_values(array_intersect($selP, array_keys($pages))));
+        $allowedPages = implode(',', array_values(array_intersect($selP, array_merge(array_keys($pages), ['settings.php']))));   // 🏛️ 2026-11-23 + «الإعدادات» اختيارية للرئاسة
         $validIds = array_map(fn($x) => (int)$x['id'], allSchools(false));
         $selS = $_POST['schools'] ?? []; if (!is_array($selS)) $selS = [];
         $hqEx = hqExcludedSchoolIds(); // 🏛️🚫 المدارس المستقلّة (القديس مكسيموس) لا تُختار للرئاسة أبداً
@@ -404,6 +404,7 @@ include __DIR__ . '/../includes/header.php';
                 <?php foreach ($pages as $pk => $pl): ?>
                     <label><input type="checkbox" name="allowed[]" value="<?= e($pk) ?>" <?= in_array($pk, $hqPages, true) ? 'checked' : '' ?>> <?= e($pl['fr']) ?> / <?= e($pl['ar']) ?></label>
                 <?php endforeach; ?>
+                    <label><input type="checkbox" name="allowed[]" value="settings.php" <?= ($hqPagesRaw !== null && in_array('settings.php', $hqPages, true)) ? 'checked' : '' ?>> Paramètres / الإعدادات</label>
             </div>
             <div style="margin-top:10px"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer / حفظ</button> <small class="text-muted">Lecture seule : la présidence ne modifie rien / عرض فقط: الرئاسة ما بتعدّل شي</small></div>
         </form>

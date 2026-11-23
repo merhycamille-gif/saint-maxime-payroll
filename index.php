@@ -202,7 +202,7 @@ $dashSections = [
         canEdit() ? ['pages/rates_history.php','fas fa-percent','Taux datés','النِّسَب حسب التاريخ'] : null,
         canEdit() ? ['pages/salary_scales.php','fas fa-layer-group','Grille','إصدارات السلسلة'] : null,
         canEdit() ? ['pages/backup.php','fas fa-database','Sauvegarde','نسخة احتياطية'] : null,
-        ['pages/settings.php','fas fa-cog','Paramètres','الإعدادات'],
+        viewerCanSeePage('settings.php') ? ['pages/settings.php','fas fa-cog','Paramètres','الإعدادات'] : null,
         isSuperAdmin() ? ['pages/email_settings.php','fas fa-envelope','Paramètres Email','إعدادات البريد'] : null,
     ])],
 ];

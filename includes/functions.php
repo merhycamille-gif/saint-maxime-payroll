@@ -221,7 +221,27 @@ function currentViewerAllowedScripts() {
         $raw = ($val === false) ? null : $val; // NULL بالقاعدة ⇒ الكل
     } catch (Exception $e) { $raw = null; }
     $cache = viewerAllowedScriptsForUser($raw);
+    // 🏛️👁️ (2026-11-23 «الإعدادات ما لازم تشوفها») الرئاسة العامة: صفحة الإعدادات تُفتح فقط إن علّمها المدير ببطاقة «شو بتشوف» — المدارس كما هي.
+    if (viewerIsHq() && !viewerHqSettingsAllowed($raw)) $cache = array_values(array_diff($cache, ['settings.php']));
     return $cache;
+}
+
+/** 🏛️👁️ (2026-11-23) الحساب الحالي = «الرئاسة العامة» (viewer متعدّد المدارس: school_id فارغ). */
+function viewerIsHq(): bool {
+    static $c = null;
+    if ($c !== null) return $c;
+    if (!isViewer()) return $c = false;
+    try {
+        $st = getDB()->prepare("SELECT school_id FROM users WHERE id = ?");
+        $st->execute([(int)($_SESSION['user_id'] ?? 0)]);
+        $v = $st->fetchColumn();
+        return $c = ($v === null);
+    } catch (Throwable $e) { return $c = false; }
+}
+/** هل «الإعدادات» معلَّمة ضمن صفحات الرئاسة؟ (allowed_pages يحوي settings.php) */
+function viewerHqSettingsAllowed($allowedRaw): bool {
+    if ($allowedRaw === null) return false;
+    return in_array('settings.php', array_map('trim', explode(',', (string)$allowedRaw)), true);
 }
 
 /** هل يستطيع المستخدم الحالي رؤية هذه الصفحة؟ (غير الـviewer يرى كل شيء). */
@@ -6533,7 +6553,7 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php /* 🖨️ (2026-10-11) زرّ «PDF رسمي» عبر Chrome أُزيل: كبسة PDF صارت من محرّك الطباعة الرسمي على الخادم بكل مكان (لا كبسات مكرّرة) */ ?>
         <?php // ✏️ (2026-10-08 «دايماً عمول هيك بكل الإفادات»): كبسة «تعديل / كتابة» بكل مستند — تخلّي الإفادة/النموذج قابلاً للكتابة قبل الطباعة
               //    (ppEditToggle بـexport.js؛ تُخفى تلقائياً حيث لا مستند بالصفحة). بلا حفظ بالقاعدة. ?>
-        <button type="button" class="btn btn-sm btn-gold" id="msaEditBtn" onclick="ppEditToggle(this)" title="عدّل أي سطر أو خانة بالمستند قبل الطباعة (للطباعة فقط)" style="display:none"><i class="fas fa-pen"></i> <span>Modifier / تعديل / كتابة</span></button>
+        <?php /* 🏛️👁️ (2026-11-23 «بس لازم تشوف… غير قابلة للتعديل») الرئاسة العامة: بلا كبسة «تعديل / كتابة» — تشوف وتطبع فقط */ if (!viewerIsHq()): ?><button type="button" class="btn btn-sm btn-gold" id="msaEditBtn" onclick="ppEditToggle(this)" title="عدّل أي سطر أو خانة بالمستند قبل الطباعة (للطباعة فقط)" style="display:none"><i class="fas fa-pen"></i> <span>Modifier / تعديل / كتابة</span></button><?php endif; ?>
         </span>
         <span class="xt-g xt-g2">
         <?php if (!$viewerOnly): ?>

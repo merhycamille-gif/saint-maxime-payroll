@@ -458,7 +458,7 @@ document.addEventListener('submit', function (e) {
             </a>
             <?php endif; ?>
 
-            <div class="nav-section" style="--ns:#2dd4bf">Système / النظام</div><?php /* 🎨 2026-10-19 «شيل الأحمر والأورانج من الأيقونات»: كان أصفر #fbbf24 ⇒ تركواز */ ?>
+            <?php if (viewerCanSeePage('settings.php')): ?><div class="nav-section" style="--ns:#2dd4bf">Système / النظام</div><?php endif; ?><?php /* 🎨 2026-10-19 «شيل الأحمر والأورانج من الأيقونات»: كان أصفر #fbbf24 ⇒ تركواز */ ?>
 
             <?php if (isSuperAdmin()): ?>
             <a href="<?= BASE_URL ?>pages/ecoles.php" class="<?= $currentPage === 'ecoles' ? 'active' : '' ?>"><?php /* 🏫 (2026-11-05) كل مدرسة ببطاقة واحدة: معلومات + Paie لكل فئة + تعديل/حذف */ ?>
@@ -531,10 +531,12 @@ document.addEventListener('submit', function (e) {
             </a>
             <?php endif; ?>
 
+            <?php if (viewerCanSeePage('settings.php')): /* 🏛️👁️ 2026-11-23 الرئاسة العامة بلا «الإعدادات» إلّا إن عُلّمت لها */ ?>
             <a href="<?= BASE_URL ?>pages/settings.php" class="<?= $currentPage === 'settings' ? 'active' : '' ?>">
                 <i class="fas fa-cog"></i>
                 <span>Paramètres / الإعدادات</span>
             </a>
+            <?php endif; ?>
             <?php if (isSuperAdmin()): ?>
             <a href="<?= BASE_URL ?>pages/email_settings.php" class="<?= $currentPage === 'email_settings' ? 'active' : '' ?>">
                 <i class="fas fa-envelope"></i>
