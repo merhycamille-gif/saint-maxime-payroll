@@ -223,6 +223,7 @@ function currentViewerAllowedScripts() {
     $cache = viewerAllowedScriptsForUser($raw);
     // 🏛️👁️ (2026-11-23 «الإعدادات ما لازم تشوفها») الرئاسة العامة: صفحة الإعدادات تُفتح فقط إن علّمها المدير ببطاقة «شو بتشوف» — المدارس كما هي.
     if (viewerIsHq() && !viewerHqSettingsAllowed($raw)) $cache = array_values(array_diff($cache, ['settings.php']));
+    if (viewerIsHq()) $cache = array_values(array_unique(array_merge($cache, ['send_report.php', 'mail_status.php'])));   // 🏛️📤 (2026-11-23) الرئاسة ترسل ما تراه بالإيميل (PDF) — لا كتابة بالداتا
     return $cache;
 }
 
@@ -362,7 +363,7 @@ function enforceViewerRestrictions() {
     $isPasswordChange = ($script === 'settings.php' && ($_POST['action'] ?? '') === 'change_password');
     // 🖨️ (2026-10-31 «ما في للطبع… احفظها عالكمبيوتر» بحساب مدرسة) html_export.php = تحويل الصفحة المعروضة إلى PDF/Excel/Word (POST html ⇒ ملف) بلا أي كتابة بالقاعدة —
     //    كان POST حساب القراءة يُطرد للوحة فيحفظ المتصفّح صفحة اللوحة باسم .pdf. القراءة فقط تبقى: لا يعدّل شيئاً، فقط يطبع ما يراه.
-    $isRenderOnly = ($script === 'html_export.php');
+    $isRenderOnly = ($script === 'html_export.php') || ($script === 'send_report.php' && viewerIsHq());   // 🏛️📤 (2026-11-23) إرسال PDF بالإيميل للرئاسة: إخراج لا تعديل
     $isWrite = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') || isset($_GET['delete']);
     if ($isWrite && !$isPasswordChange && !$isRenderOnly) {
         $_SESSION['flash_error'] = 'قراءة فقط: التعديل غير مسموح. / Lecture seule : modification interdite.';
@@ -6522,7 +6523,10 @@ function exportToolbar($title = 'document', $opts = []) {
     $showEmail = $opts['email_btn'] ?? true;
     // مستخدم «قراءة فقط» (حساب مدرسة): يُسمح له بالتصدير كـ PDF و WhatsApp فقط — لا طباعة مباشرة/Excel/Word/Email
     $viewerOnly = isViewer();
-    if ($viewerOnly) { $showEmail = false; }
+    // 🏛️📤 (2026-11-23 «خلّي خيار الإرسال: الواتساب والإيميل والوورد والإكسل بالطباعة» — لابتوب الرئاسة العامة) الرئاسة: كل خيارات الإخراج
+    //    (طباعة · PDF · Excel · Word · WhatsApp من واتسابها · Email من البرنامج مسجَّلاً بسجلّ الإيميلات) — وتبقى بلا «تعديل / كتابة». حسابات المدارس كما هي.
+    $hqFull = $viewerOnly && viewerIsHq();
+    if ($viewerOnly && !$hqFull) { $showEmail = false; }
     // النماذج الحكومية الثابتة: نخفي Excel/Word العامّين (يطلعان متل بلوك/صورة) — محلّهما
     // التعبئة من القالب الرسمي (أزرار خاصة بالصفحة) + PDF رسمي. $opts['no_office']=true.
     $noOffice = $opts['no_office'] ?? false;
@@ -6556,7 +6560,7 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php /* 🏛️👁️ (2026-11-23 «بس لازم تشوف… غير قابلة للتعديل») الرئاسة العامة: بلا كبسة «تعديل / كتابة» — تشوف وتطبع فقط */ if (!viewerIsHq()): ?><button type="button" class="btn btn-sm btn-gold" id="msaEditBtn" onclick="ppEditToggle(this)" title="عدّل أي سطر أو خانة بالمستند قبل الطباعة (للطباعة فقط)" style="display:none"><i class="fas fa-pen"></i> <span>Modifier / تعديل / كتابة</span></button><?php endif; ?>
         </span>
         <span class="xt-g xt-g2">
-        <?php if (!$viewerOnly): ?>
+        <?php if (!$viewerOnly || $hqFull): ?>
             <?php if ($server): ?>
             <a class="btn btn-sm btn-success" href="<?= $sv . $sep ?>format=xlsx"><i class="fas fa-file-excel"></i> Excel</a>
             <a class="btn btn-sm btn-info" href="<?= $sv . $sep ?>format=docx"><i class="fas fa-file-word"></i> Word</a>

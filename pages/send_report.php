@@ -14,7 +14,7 @@ $out = function (bool $ok, string $msg, array $extra = []) { echo json_encode(ar
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') $out(false, 'طلب غير صالح');
 if (!verifyCsrf($_POST['csrf'] ?? '')) $out(false, 'رمز الأمان غير صحيح — أعد تحميل الصفحة وحاول مجدداً');
-if (!canEdit()) $out(false, 'غير مسموح — حساب قراءة فقط');
+if (!canEdit() && !viewerIsHq()) $out(false, 'غير مسموح — حساب قراءة فقط');   // 🏛️📤 (2026-11-23) الرئاسة العامة ترسل ما تراه (مسجَّل بسجلّ الإيميلات)
 
 $to = trim((string)($_POST['to'] ?? ''));
 $subject = trim((string)($_POST['subject'] ?? '')) ?: 'مستند من برنامج الرواتب';
