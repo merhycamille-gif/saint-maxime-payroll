@@ -423,7 +423,7 @@ $S['s_sal'] = [
     [$t('transport'), $curFix($transport)],
     [$t('tax'), $subj($emp['tax_subject'] ?? 0, $emp['tax_includes_echelon'] ?? 0, $emp['tax_includes_extra'] ?? 0, $emp['tax_includes_prime_aide'] ?? 0)],
     [$t('cnss_s'), $subj($emp['cnss_subject'] ?? 0, $emp['cnss_includes_echelon'] ?? 0, $emp['cnss_includes_extra'] ?? 0, $emp['cnss_includes_prime_aide'] ?? 0)],
-    [$t('eoc_s'), $subj($emp['eoc_subject'] ?? 0, $emp['eoc_includes_echelon'] ?? 0, $emp['eoc_includes_extra'] ?? 0, $emp['eoc_includes_prime_aide'] ?? 0)],
+    [$t('eoc_s'), $subj(empEocSubjectNow($emp) ? 1 : 0, $emp['eoc_includes_echelon'] ?? 0, $emp['eoc_includes_extra'] ?? 0, $emp['eoc_includes_prime_aide'] ?? 0)],
 ];
 
 // الصورة الشخصية (إن وُجدت على هذا الجهاز — محرّك الطباعة يقرأها من الملف نفسه)

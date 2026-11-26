@@ -220,7 +220,7 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
             <div><div class="k">الهاتف / Téléphone</div><div class="v eh-num"><?= e(trim(implode(' / ', array_filter([trim((string)$emp['phone1']), trim((string)$emp['phone2'])]))) ?: '—') ?></div></div>
             <div><div class="k">ترك من الكل / Départ définitif</div><div class="v eh-num"><?= $d($emp['left_date_all']) ?></div></div>
             <div><div class="k">ترك الضمان · المالية · الصندوق</div><div class="v eh-num"><?= $d($emp['left_date_cnss']) ?> · <?= $d($emp['left_date_finance']) ?> · <?= $d($emp['left_date_eoc']) ?></div></div>
-            <div><div class="k">الخضوع: ضمان · ضريبة · صندوق</div><div class="v"><?= (int)$emp['cnss_subject'] ? 'ضمان ✓' : 'ضمان ✗' ?> · <?= (int)$emp['tax_subject'] ? 'ضريبة ✓' : 'ضريبة ✗' ?> · <?= (int)$emp['eoc_subject'] ? 'صندوق ✓' : 'صندوق ✗' ?></div></div>
+            <div><div class="k">الخضوع: ضمان · ضريبة · صندوق</div><div class="v"><?= (int)$emp['cnss_subject'] ? 'ضمان ✓' : 'ضمان ✗' ?> · <?= (int)$emp['tax_subject'] ? 'ضريبة ✓' : 'ضريبة ✗' ?> · <?= empEocSubjectNow($emp) ? 'صندوق ✓' : 'صندوق ✗' ?></div></div>
             <div><div class="k">التعويض العائلي بالملف</div><div class="v eh-num"><?= $fmt($emp['family_allowance_spouse_lbp']) ?> زوجة · <?= $fmt($emp['family_allowance_children_lbp']) ?> أولاد</div></div>
         </div>
 

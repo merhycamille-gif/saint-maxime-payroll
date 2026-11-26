@@ -18,6 +18,7 @@ function reglesUniquesRegistre(): array {
         ['الخضوع بعد تاريخ الترك (ضمان / مالية / صندوق)', '/left_date_(cnss|finance|eoc)\s*(<|>|<=|>=)\s*|(<|>|<=|>=)\s*\$?\w*\[?[\'"]?left_date_(cnss|finance|eoc)/', [$F, 'includes/eoc_portal.php', 'fix_departures_once.php'], 'leftDateOfFor() · monthSubjectTo() · leftDateSql()'],
         ['نِسَب قانونية مكتوبة باليد (0.06 / 0.03 / 0.08 / 0.085)', '/\*\s*0\.(06|03|08|085)\b|\*\s*(6|3|8|8\.5)\s*\/\s*100\b/', [$F, $C], 'rateFrac() ⇐ «النِّسَب حسب التاريخ»'],
         ['إصدار سلسلة الرواتب مثبَّت باليد', '/version_id\s*=\s*1\b/', [$F, $C, 'pages/salary_scales.php'], 'scaleVersionIdAsOf() · scaleSalaryMap() · scaleSalaryLBP()'],
+        ['عرض «خاضع لصندوق التعويضات» من العمود مباشرة', '/\$\w+\[.eoc_subject.\]\s*(\?\?\s*\d\s*)?\)?\s*(\?|===|==|,)/', [$F, $C, 'pages/employees.php', 'includes/cadre_due.php', 'pages/teacher_form.php'], 'empEocSubjectNow() · monthSubjectTo(eoc)'],
         ['شطور ضريبة الدخل', '/FROM\s+tax_brackets\b/i', [$F, $C, 'pages/settings.php', 'pages/state_laws.php', 'pages/tax_brackets.php'], 'دالّة الضريبة بالمحرّك'],
         ['فروع الضمان حسب الجنسيّة (غير اللبناني)', '/cnss_br_(maladie|family|eos)\b/', [$F, $C, 'pages/employees.php', 'pages/teacher_form.php', 'includes/annual_slip_data.php'], 'cnssBranchOn()'],
     ];

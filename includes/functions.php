@@ -62,7 +62,7 @@ if (!function_exists('empFullNameFr')) {
         $f = [
             ['on' => (int)($e['cnss_subject'] ?? 1) === 1, 'fr' => 'CNSS',   'ar' => 'ضمان'],
             ['on' => (int)($e['tax_subject'] ?? 1) === 1,  'fr' => 'Impôt',  'ar' => 'ضريبة'],
-            ['on' => (int)($e['eoc_subject'] ?? 1) === 1 && monthSubjectTo($e, 'eoc', (int)date('Y'), (int)date('n')),  'fr' => 'Caisse', 'ar' => 'صندوق'],   // 26/11: ملاك بلغ 64 = لا صندوق
+            ['on' => (int)($e['eoc_subject'] ?? 1) === 1 && !titulaireExemptEoc64($e, (int)date('n'), (int)date('Y')),  'fr' => 'Caisse', 'ar' => 'صندوق'],   // 26/11: ملاك بلغ 64 = لا صندوق
         ];
         $on = array_values(array_filter($f, fn($x) => $x['on']));
         if (count($on) === 3) return 'Oui / نعم';
@@ -1765,7 +1765,7 @@ function newTeachersReportCols(): array {
         'hours'    => ['ساعات/أيام بالأسبوع / Heures-jours', fn($r) => $t(nfc((float)($r['hours_per_week'] ?? 0), 1, true) . ' س / ' . (int)($r['days_per_week'] ?? 0) . ' ي'), 12],
         'grade'    => ['الدرجة / Échelon', fn($r) => $t(gradeDisplay($r)), 8],
         'mof'      => ['رقم المالية / N° MOF', fn($r) => ((int)($r['tax_subject'] ?? 1)) === 1 ? ($t($r['finance_ministry_number'] ?? '') !== '' ? $t($r['finance_ministry_number']) : '⚠️ ناقص') : 'لا يخضع', 14],
-        'caisse'   => ['رقم الصندوق / N° Caisse', fn($r) => ((int)($r['eoc_subject'] ?? 0)) === 1 ? ($t($r['caisse_number'] ?? '') !== '' ? $t($r['caisse_number']) : '⚠️ ناقص') : 'لا يخضع', 12],
+        'caisse'   => ['رقم الصندوق / N° Caisse', fn($r) => empEocSubjectNow($r) ? ($t($r['caisse_number'] ?? '') !== '' ? $t($r['caisse_number']) : '⚠️ ناقص') : ($t($r['caisse_number'] ?? '') !== '' ? $t($r['caisse_number']) : 'لا يخضع'), 12],
         'setup'    => ['الإعداد المالي بالملف / Paramétrage', function ($r) use ($t, $lbp) {
             $mode = $t($r['salary_input_mode'] ?? '');
             if (($r['employee_type'] ?? '') === 'enseignant_titulaire') return 'ملاك — السلسلة حسب الدرجة';
@@ -2509,6 +2509,8 @@ function employeExemptEos64(array $emp, int $month, int $year): bool {
 function emp64Date(array $emp): string { $b = (string)($emp['birth_date'] ?? ''); return ($b !== '' && $b > '1900-01-01') ? date('Y-m-d', strtotime($b . ' +64 years')) : ''; }
 /** بلغ الـ64 بتاريخ معيّن (افتراضياً اليوم)؟ المصدر الواحد للشاشات والإفادات (العرض) — الحساب يمرّ من titulaireExemptEoc64 / employeExemptEos64. */
 function empPast64(array $emp, ?string $date = null): bool { $d = emp64Date($emp); return $d !== '' && $d <= ($date ?: date('Y-m-d')); }
+/** 🔒 المصدر الواحد لعرض «خاضع لصندوق التعويضات؟» اليوم: مفتاح الملفّ + سنّ الـ64 (ملاك بلغ 64 = لا). كل شاشة/إفادة/بطاقة تسأل هنا لا العمود eoc_subject مباشرة. */
+function empEocSubjectNow(array $emp): bool { return (int)($emp['eoc_subject'] ?? 0) === 1 && !titulaireExemptEoc64($emp, (int)date('n'), (int)date('Y')); }
 function titulaireExemptEoc64(array $emp, int $month, int $year): bool {
     if (($emp['employee_type'] ?? '') !== 'enseignant_titulaire') return false;
     $age = ageOnDate($emp['birth_date'] ?? '', date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $year, $month))));

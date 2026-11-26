@@ -288,7 +288,7 @@ if ($emp && !empty($_GET['dossier'])):
             // الخضوع للاقتطاعات
             $t  = $row2('خاضع للضريبة', (int)($emp['tax_subject']??0) ? ('نعم — يشمل: '.$incLbl($emp['tax_includes_echelon']??0,$emp['tax_includes_extra']??0,$emp['tax_includes_prime_aide']??0)) : 'لا');
             $t .= $row2('خاضع للضمان', (int)($emp['cnss_subject']??0) ? ('نعم — يشمل: '.$incLbl($emp['cnss_includes_echelon']??0,$emp['cnss_includes_extra']??0,$emp['cnss_includes_prime_aide']??0)) : 'لا');
-            $t .= $row2('خاضع لصندوق التعويضات', (int)($emp['eoc_subject']??0) ? ('نعم — يشمل: '.$incLbl($emp['eoc_includes_echelon']??0,$emp['eoc_includes_extra']??0,$emp['eoc_includes_prime_aide']??0)) : 'لا');
+            $t .= $row2('خاضع لصندوق التعويضات', empEocSubjectNow($emp) ? ('نعم — يشمل: '.$incLbl($emp['eoc_includes_echelon']??0,$emp['eoc_includes_extra']??0,$emp['eoc_includes_prime_aide']??0)) : 'لا');
             ?>
             <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:22px">
                 <?= $section('معلومات شخصية', 'fa-user', $p) ?>
