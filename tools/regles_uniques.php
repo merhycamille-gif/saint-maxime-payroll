@@ -22,6 +22,7 @@ function reglesUniquesRegistre(): array {
         ['الفترة المدفوعة (من شهر ← إلى شهر)', '/pay_(from|to)_month\s*\+\s*2\s*\)\s*%\s*12|pay_(from|to)_month[\'"]?\]?\s*(<|>|<=|>=)\s|payment_months_per_year\s*=\s*1[01]\b/', [$F, $C, 'pages/employees.php', 'includes/heal_cleanup_20261102.php'], 'paidMonthsFor() · paidPeriodLabel()'],
         ['نافذة أشهر النقل وقيمة النقل القانونية', '/getSetting\(\s*[\'"]transport_/', [$F, $C, 'pages/settings.php'], 'transportMonthActive() · transportDailyLawForMonth() · transportDailyEffective()'],
         ['التعويض العائلي حسب التاريخ', '/FROM\s+family_allowance_changes\b(?!\))/i', [$F, $C], 'familyAllowanceForMonth() · familyAllowanceKindAmount()'],
+        ['درجة البداية حسب الشهادة', '/FROM\s+diploma_starting_grades/i', [$F, $C, 'pages/diplomas.php', 'pages/settings.php'], 'diplomaRows() · diplomaRow() · diplomaStartGrade()'],
         ['شطور ضريبة الدخل', '/FROM\s+tax_brackets\b/i', [$F, $C, 'pages/settings.php', 'pages/state_laws.php', 'pages/tax_brackets.php'], 'دالّة الضريبة بالمحرّك'],
         ['فروع الضمان حسب الجنسيّة (غير اللبناني)', '/cnss_br_(maladie|family|eos)\b/', [$F, $C, 'pages/employees.php', 'pages/teacher_form.php', 'includes/annual_slip_data.php'], 'cnssBranchOn()'],
     ];

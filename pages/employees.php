@@ -602,9 +602,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             // (دخول + درجة فورية إلا التعليمية + تدرّج عادي + استثنائية 244/102/223/2017 أو 4+4+2، وقانون 344 يدوي).
             if ($data['employee_type'] === 'enseignant_titulaire' && $data['titularization_date']) {
                 // درجة الدخول = أرضية الشهادة (القانون)، إلا إذا أدخل المستخدم أعلى (خبرة سابقة)
-                $dipG = $db->prepare("SELECT starting_grade FROM diploma_starting_grades WHERE diploma_code = ?");
-                $dipG->execute([$data['diploma']]);
-                $dipStart = $dipG->fetchColumn();
+                $dipStart = diplomaStartGrade($data['diploma']);
                 $startG = ($dipStart !== false) ? max((float)$data['starting_grade'], (float)$dipStart) : (float)$data['starting_grade'];
                 $db->prepare("UPDATE employees SET starting_grade = ? WHERE id = ?")->execute([$startG, $id]);
                 try { buildLegalGradeHistory($id); } catch (Exception $ex) { /* بيانات ناقصة → تُترك للإدخال اليدوي */ }
@@ -699,9 +697,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             } elseif (($diplomaChanged || $datesChanged) && $data['employee_type'] === 'enseignant_titulaire' && $data['titularization_date']) {
                 // إن تغيّرت الشهادة، اضبط درجة الدخول من الشهادة الجديدة (أرضية)
                 if ($diplomaChanged) {
-                    $dipG = $db->prepare("SELECT starting_grade FROM diploma_starting_grades WHERE diploma_code = ?");
-                    $dipG->execute([$data['diploma']]);
-                    $dipStart = $dipG->fetchColumn();
+                    $dipStart = diplomaStartGrade($data['diploma']);
                     if ($dipStart !== false) $db->prepare("UPDATE employees SET starting_grade = ? WHERE id = ?")->execute([(float)$dipStart, $id]);
                 }
                 // المحرّك يبني: دخول + فورية + تدرّج + استثنائية تلقائية (244/102/223/2017 أو 4+4+2). قانون 344 يدوي محفوظ.
@@ -1436,7 +1432,7 @@ if ($action === 'edit' && $id > 0) {
 $pageTitle = $action === 'new' ? 'Nouvel employé / موظف جديد' : 'Modifier / تعديل: ' . trim($employee['first_name_fr'] . ' ' . $employee['last_name_fr']);
 
 // Get diplomas
-$diplomas = $db->query("SELECT * FROM diploma_starting_grades")->fetchAll();
+$diplomas = diplomaRows();
 $exceptionalLaws = $db->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1 ORDER BY law_date")->fetchAll();
 
 // Get applied exceptional laws for this employee

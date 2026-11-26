@@ -68,7 +68,7 @@ $d = fn($v) => ($v && $v !== '0000-00-00' && $v >= '1900-01-01') ? date('d/m/Y',
 $typeLbl = ['enseignant_titulaire' => 'أستاذ ملاك / Enseignant titulaire', 'enseignant_contractuel' => 'أستاذ متعاقد / Enseignant contractuel', 'employe' => 'موظف (قانون العمل) / Employé'];
 $bonusLbl = ['prime_fixe' => 'الأجر الإضافي', 'aide_complementaire' => 'مكافأة ومساعدة', 'transport_complement' => 'نقل شهري', 'transport_daily' => 'نقل يومي', 'extra' => 'إضافي', 'prime_aide' => 'مكافأة'];
 $dipLbl = [];
-try { foreach ($db->query("SELECT diploma_code, diploma_name_ar, diploma_name_fr FROM diploma_starting_grades") as $dr) $dipLbl[$dr['diploma_code']] = $dr['diploma_name_ar'] . ' / ' . $dr['diploma_name_fr']; } catch (Throwable $e) {}
+try { foreach (diplomaRows() as $dr) $dipLbl[$dr['diploma_code']] = $dr['diploma_name_ar'] . ' / ' . $dr['diploma_name_fr']; } catch (Throwable $e) {}
 ?>
 <style>
 .eh-search { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }

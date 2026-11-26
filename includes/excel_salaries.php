@@ -44,7 +44,7 @@ function excelSalariesDiplomas(PDO $db): array {
     static $cache = null;
     if ($cache !== null) return $cache;
     $cache = [];
-    try { foreach ($db->query("SELECT diploma_code, diploma_name_ar, diploma_name_fr FROM diploma_starting_grades")->fetchAll(PDO::FETCH_ASSOC) as $d) $cache[$d['diploma_code']] = ['ar' => (string)$d['diploma_name_ar'], 'fr' => (string)$d['diploma_name_fr']]; }
+    try { foreach (diplomaRows() as $d) $cache[$d['diploma_code']] = ['ar' => (string)$d['diploma_name_ar'], 'fr' => (string)$d['diploma_name_fr']]; }
     catch (Throwable $e) {}
     return $cache;
 }

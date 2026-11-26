@@ -7676,6 +7676,12 @@ function socialStatusLabel($status, $lang = 'fr') {
     return $labels[$status][$lang] ?? $status;
 }
 
+/** 🔒 (2026-11-26 المصدر الواحد) جدول الشهادات (درجة البداية القانونية، الدرجة الفورية، الأسماء): كل قراءة تمرّ من هنا. قراءة طازجة (لا ذاكرة) كي يظهر تعديل الجدول فوراً. */
+function diplomaRows(bool $byGrade = false): array { return getDB()->query("SELECT * FROM diploma_starting_grades" . ($byGrade ? " ORDER BY starting_grade" : ""))->fetchAll(PDO::FETCH_ASSOC); }
+/** صفّ شهادة واحدة أو null */
+function diplomaRow($code): ?array { $st = getDB()->prepare("SELECT * FROM diploma_starting_grades WHERE diploma_code = ?"); $st->execute([(string)$code]); $r = $st->fetch(PDO::FETCH_ASSOC); return $r ?: null; }
+/** درجة البداية القانونية للشهادة، أو false إن لم توجد (كما fetchColumn) */
+function diplomaStartGrade($code) { $r = diplomaRow($code); return $r ? $r['starting_grade'] : false; }
 function diplomaLabel($code, $lang = 'fr') {
     static $diplomas = null;
     if ($diplomas === null) {

@@ -145,7 +145,7 @@ $allHidden = $allMode ? '<input type="hidden" name="all" value="1">' : '';
 $newHidden = $isNew ? '<input type="hidden" name="new" value="1">' : '';
 
 // لائحة الشهادات للقائمة المنسدلة
-$diplomas = $db->query("SELECT diploma_code, diploma_name_ar, diploma_name_fr, starting_grade FROM diploma_starting_grades ORDER BY starting_grade")->fetchAll();
+$diplomas = diplomaRows(true);
 // لائحة الصفوف (محصّنة: قد لا يكون الجدول موجوداً قبل migration 015، أو عمود name_fr ناقصاً قبل 016 — لذا SELECT *)
 try { $classLevels = $db->query("SELECT * FROM class_levels WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll(); }
 catch (Exception $e) { $classLevels = []; }

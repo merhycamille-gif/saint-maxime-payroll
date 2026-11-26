@@ -279,7 +279,7 @@ function cadreDueCandidates__raw(PDO $db, string $sy, ?array $schoolIds = null, 
     if (!$rows) return [];
     $dec = cadreDueDecisions($db, $sy);
     $dips = [];
-    foreach ($db->query("SELECT diploma_code, starting_grade, gets_immediate_grade FROM diploma_starting_grades") as $d) $dips[$d['diploma_code']] = $d;
+    foreach (diplomaRows() as $d) $dips[$d['diploma_code']] = $d;
     $gh = $db->prepare("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = ?");
     $last = $db->prepare("SELECT base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = ? AND base_plus_echelon_lbp > 0 ORDER BY year DESC, month DESC LIMIT 1");
     $out = [];
@@ -336,9 +336,7 @@ function titularizeContractTeacher(PDO $db, int $empId, string $sy, string $who 
     if (!$emp) throw new Exception('الموظف غير موجود');
     if ($emp['employee_type'] !== 'enseignant_contractuel') throw new Exception('ليس أستاذاً متعاقداً');
     if (isSchoolYearLocked((int)$emp['school_id'], $sy)) throw new Exception(yearLockedMsg((int)$emp['school_id'], $sy));
-    $dq = $db->prepare("SELECT starting_grade, gets_immediate_grade FROM diploma_starting_grades WHERE diploma_code = ?");
-    $dq->execute([(string)$emp['diploma']]);
-    $dip = $dq->fetch(PDO::FETCH_ASSOC);
+    $dip = diplomaRow((string)$emp['diploma']);
     if (!$dip) throw new Exception('بلا شهادة بملفه — عبّي الشهادة أوّلاً');
     $tit = sprintf('%04d-10-01', $y1);
     $startG = max((float)$emp['starting_grade'], (float)$dip['starting_grade']);
