@@ -1433,7 +1433,7 @@ $pageTitle = $action === 'new' ? 'Nouvel employé / موظف جديد' : 'Modifi
 
 // Get diplomas
 $diplomas = diplomaRows();
-$exceptionalLaws = $db->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1 ORDER BY law_date")->fetchAll();
+$exceptionalLaws = exceptionalLaws();
 
 // Get applied exceptional laws for this employee
 $appliedLaws = [];

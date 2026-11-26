@@ -4719,7 +4719,8 @@ check('تنظيف: صفحة الدرجات بلا «Promotion (+1)»/«ترقي�
       strpos($gr88, 'auto_promote') === false && strpos($gr88, 'Promotion (+1)') === false
       && strpos($gr88, 'نص درجة كل سنة') !== false
       && strpos($gr88, 'FLOOR(e.current_grade) = sc.grade') !== false
-      && strpos($gr88, "(int)floor((float)\$emp['current_grade'])") !== false);
+      && strpos($gr88, "scaleRow(\$emp['current_grade'])") !== false   // 26/11/2026: الدرجة الكاملة صارت داخل المصدر الواحد scaleRow()
+      && (int)(scaleRow(39.5)['grade'] ?? 0) === 39 && (float)(scaleRow(39.5)['new_salary_2017'] ?? -1) === (float)scaleSalaryLBP(39));
 check('تنظيف: الإعدادات بلا بطاقة «معلومات المدارس» + النسخ الاحتياطي يطوي الجداول الداخلية + شريط التصدير مخفي على صفحات الإعدادات + cols-5',
       strpos((string)file_get_contents($PROJ . '/pages/settings.php'), 'Informations des écoles') === false
       && strpos((string)file_get_contents($PROJ . '/pages/backup.php'), '$internalTables') !== false

@@ -23,6 +23,8 @@ function reglesUniquesRegistre(): array {
         ['نافذة أشهر النقل وقيمة النقل القانونية', '/getSetting\(\s*[\'"]transport_/', [$F, $C, 'pages/settings.php'], 'transportMonthActive() · transportDailyLawForMonth() · transportDailyEffective()'],
         ['التعويض العائلي حسب التاريخ', '/FROM\s+family_allowance_changes\b(?!\))/i', [$F, $C], 'familyAllowanceForMonth() · familyAllowanceKindAmount()'],
         ['درجة البداية حسب الشهادة', '/FROM\s+diploma_starting_grades/i', [$F, $C, 'pages/diplomas.php', 'pages/settings.php'], 'diplomaRows() · diplomaRow() · diplomaStartGrade()'],
+        ['قوانين الدرجات الاستثنائية', '/FROM\s+exceptional_grades_laws/i', [$F, $C, 'pages/exceptional_laws.php'], 'exceptionalLaws() · exceptionalLaw()'],
+        ['سلسلة الرواتب (قراءة مباشرة)', '/FROM\s+salary_scale_2017/i', [$F, $C, 'pages/salary_scales.php'], 'scaleSalaryLBP() · scaleSalaryMap() · scaleRow()'],
         ['شطور ضريبة الدخل', '/FROM\s+tax_brackets\b/i', [$F, $C, 'pages/settings.php', 'pages/state_laws.php', 'pages/tax_brackets.php'], 'دالّة الضريبة بالمحرّك'],
         ['فروع الضمان حسب الجنسيّة (غير اللبناني)', '/cnss_br_(maladie|family|eos)\b/', [$F, $C, 'pages/employees.php', 'pages/teacher_form.php', 'includes/annual_slip_data.php'], 'cnssBranchOn()'],
     ];

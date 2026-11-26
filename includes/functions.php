@@ -7676,6 +7676,12 @@ function socialStatusLabel($status, $lang = 'fr') {
     return $labels[$status][$lang] ?? $status;
 }
 
+/** 🔒 (2026-11-26 المصدر الواحد) قوانين الدرجات الاستثنائية الفعّالة (بترتيب التاريخ إن طُلب) — كل قراءة للجدول خارج صفحة إدخاله تمرّ من هنا. */
+function exceptionalLaws(bool $byDate = true): array { return getDB()->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1" . ($byDate ? " ORDER BY law_date" : ""))->fetchAll(); }
+/** قانون استثنائي واحد برقمه (الفعّال فقط افتراضياً) أو false */
+function exceptionalLaw($lawNumber, bool $activeOnly = true) { $st = getDB()->prepare("SELECT * FROM exceptional_grades_laws WHERE law_number = ?" . ($activeOnly ? " AND is_active = 1" : "")); $st->execute([$lawNumber]); return $st->fetch(); }
+/** 🔒 صفّ السلسلة لدرجة (الدرجة الكاملة) بالإصدار الساري بتاريخ، أو false */
+function scaleRow($grade, $asOfDate = null) { $st = getDB()->prepare("SELECT * FROM salary_scale_2017 WHERE version_id = ? AND grade = ?"); $st->execute([scaleVersionIdAsOf($asOfDate), (int)floor((float)$grade)]); return $st->fetch(); }
 /** 🔒 (2026-11-26 المصدر الواحد) جدول الشهادات (درجة البداية القانونية، الدرجة الفورية، الأسماء): كل قراءة تمرّ من هنا. قراءة طازجة (لا ذاكرة) كي يظهر تعديل الجدول فوراً. */
 function diplomaRows(bool $byGrade = false): array { return getDB()->query("SELECT * FROM diploma_starting_grades" . ($byGrade ? " ORDER BY starting_grade" : ""))->fetchAll(PDO::FETCH_ASSOC); }
 /** صفّ شهادة واحدة أو null */

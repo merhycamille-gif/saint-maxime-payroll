@@ -78,7 +78,7 @@ if (isset($_GET['rebuild_legal']) && $employeeId > 0) {
 // تابلو الدرجات الاستثنائية (تشيك مارك): يطبّق المؤشَّر ويلغي غير المؤشَّر — تحكّم لكل أستاذ
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exc_save']) && $employeeId > 0) {
     $checked = array_map('strval', (array)($_POST['exc_laws'] ?? []));
-    $lawRows = $db->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1")->fetchAll(PDO::FETCH_ASSOC);
+    $lawRows = exceptionalLaws(false);
     $empExc  = $db->query("SELECT * FROM employees WHERE id = " . (int)$employeeId)->fetch(PDO::FETCH_ASSOC);
     $appl = $db->prepare("SELECT DISTINCT law_reference FROM employee_grade_history WHERE employee_id = ? AND law_reference IS NOT NULL");
     $appl->execute([$employeeId]);
@@ -145,8 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save'])
             foreach ($gunit as $k) { if (preg_match('/^(.+)__(\d+)$/', $k, $m)) $byLaw[$m[1]][] = (int)$m[2]; }
             $insU = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,0,?,?,1,?,'exceptional',?,?)");
             foreach ($byLaw as $ln => $idxs) {
-                $lw = $db->prepare("SELECT * FROM exceptional_grades_laws WHERE law_number=? AND is_active=1");
-                $lw->execute([$ln]); $lw = $lw->fetch();
+                $lw = exceptionalLaw($ln);
                 if (!$lw) continue;
                 $units = exceptionalGrantUnits($emp, $lw);      // يُحسب مرّة قبل أي إدراج (idx ثابت)
                 foreach ($idxs as $i) {
@@ -380,11 +379,9 @@ include __DIR__ . '/../includes/header.php';
     $history->execute([$employeeId]);
     $history = $history->fetchAll();
     
-    $stmt = $db->prepare("SELECT * FROM salary_scale_2017 WHERE version_id = ? AND grade = ?");
-    $stmt->execute([scaleVersionIdAsOf(), (int)floor((float)$emp['current_grade'])]);   // الراتب على الدرجة الكاملة (39.5 = 39)
-    $currentScale = $stmt->fetch();
+    $currentScale = scaleRow($emp['current_grade']);   // الراتب على الدرجة الكاملة (39.5 = 39)
     
-    $laws = $db->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1 ORDER BY law_date")->fetchAll();
+    $laws = exceptionalLaws();
     $appliedLaws = $db->prepare("SELECT law_reference FROM employee_grade_history WHERE employee_id = ? AND law_reference IS NOT NULL");
     $appliedLaws->execute([$employeeId]);
     $appliedLaws = $appliedLaws->fetchAll(PDO::FETCH_COLUMN);
