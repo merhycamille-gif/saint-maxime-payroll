@@ -2498,6 +2498,32 @@ function employeExemptEos64(array $emp, int $month, int $year): bool {
     $age = ageOnDate($emp['birth_date'] ?? '', date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $year, $month))));
     return $age !== null && $age >= 64;
 }
+/**
+ * ⚖️ (2026-11-26، المدير: «بس يصير 64 ببطّل في حسم صندوق تعويضات حتى لو بقي الأستاذ بالمدرسة… ما في داعي تسألني» + «في أستاذ بلغ 64 وبعدك عم تدفّعني عنّو»):
+ * أستاذ الملاك ببلوغه 64 (بنهاية شهر الراتب) ⇒ صندوق التعويضات ٦٪ عنه وعن المدرسة (+ حسم الدرجة) يتوقّف **تلقائياً بالقانون** من ذلك الشهر —
+ * بلا قرار «يبقى» ولا مفتاح keep_working_past_64 (كما الموظف مع نهاية الخدمة ٨,٥٪). الضمان وضريبة الدخل يبقيان. المصدر الواحد للمحرّك وللشفاء.
+ */
+function titulaireExemptEoc64(array $emp, int $month, int $year): bool {
+    if (($emp['employee_type'] ?? '') !== 'enseignant_titulaire') return false;
+    $age = ageOnDate($emp['birth_date'] ?? '', date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $year, $month))));
+    return $age !== null && $age >= 64;
+}
+/** 🩹 يعيد حساب سنوات أساتذة الملاك الذين لهم شهر مخزّن بعد الـ64 وما زال يحمل صندوق التعويضات. 🔒 المدفوع بسنة سابقة محميّ (صُرِّح عنه للصندوق) ويبقى. كل 3 ساعات. */
+function healTitulaire64Eoc(bool $force = false): int {
+    if (!$force && !healGateOpen('heal_titulaire64_eoc')) return 0;
+    $n = 0;
+    try {
+        $db = getDB();
+        $rows = $db->query("SELECT DISTINCT ms.employee_id, ms.school_year FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.birth_date IS NOT NULL AND e.birth_date > '1900-01-01'
+              AND (ms.caisse_amount_lbp > 0 OR ms.school_eoc_6_lbp > 0 OR ms.eoc_grade_lbp > 0)
+              AND TIMESTAMPDIFF(YEAR, e.birth_date, LAST_DAY(CONCAT(ms.year, '-', LPAD(ms.month, 2, '0'), '-01'))) >= 64
+              AND ms.school_year >= " . $db->quote(currentSchoolYear()) . "")->fetchAll(PDO::FETCH_ASSOC);   // 🔒 السنة الحالية وما بعدها فقط: السنوات السابقة (مدفوعة أو لا) صُرِّح عنها ولا تُمسّ
+        foreach ($rows as $r) { if (recalcEmployeeYear((int)$r['employee_id'], (string)$r['school_year']) > 0) $n++; }
+        if ($n) logAudit('heal_titulaire64_eoc', 'monthly_salaries', 0, null, ['employee_years' => $n]);
+    } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
+    return $n;
+}
 function healEmploye64EndOfService(bool $force = false): int {
     if (!$force && !healGateOpen('heal_employe64_eos')) return 0;
     $n = 0;

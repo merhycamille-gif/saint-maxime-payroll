@@ -419,7 +419,8 @@ class PayrollCalculator {
         $endOfMonth = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $this->year, $this->month)));
         $ageEnd = ageOnDate($emp['birth_date'] ?? '', $endOfMonth);
         $past64Employe = employeExemptEos64($emp, (int)$this->month, (int)$this->year); // المصدر الواحد
-        if ($ageEnd !== null && $ageEnd >= 64 && $emp['employee_type'] === 'enseignant_titulaire' && !empty($emp['keep_working_past_64'])) $past64Titulaire = true;
+        // ⚖️ (2026-11-26 «بس يصير 64 ببطّل في حسم صندوق تعويضات حتى لو بقي الأستاذ بالمدرسة — ما في داعي تسألني»): للأستاذ الملاك أيضاً **تلقائي بالقانون** بلا قرار/مفتاح.
+        $past64Titulaire = titulaireExemptEoc64($emp, (int)$this->month, (int)$this->year); // المصدر الواحد
 
         // === 5. Calculate deductions ===
         // تطبيق الحد الأدنى/الأقصى للأجر الخاضع لكل فرع (جدول cnss_brackets، حسب تاريخ الشهر).

@@ -117,8 +117,9 @@ function age64List($db, $activeYearOnly = false) {
  * $emptyHtml يُعرض إن كانت القائمة فارغة (اختياري — للصفحة الخاصة).
  */
 function renderAge64Cards($rows, $emptyHtml = '') {
-    $need = array_values(array_filter($rows, fn($r) => empty($r['keep_working_past_64'])));
-    $kept = array_values(array_filter($rows, fn($r) => !empty($r['keep_working_past_64'])));
+    // ⚖️ تلقائياً بالقانون (26/11/2026): محسومات التقاعد تتوقّف من شهر بلوغ 64 بلا قرار ⇒ لا «قرار مطلوب»؛ الكل يظهر كمستمرّين، ويبقى زرّ «تركه» لمن ترك فعلاً.
+    $need = [];
+    $kept = array_values($rows);
     if (!$need && !$kept) { echo $emptyHtml; return; }
     ?>
     <?php if ($need): ?>
@@ -160,7 +161,7 @@ function renderAge64Cards($rows, $emptyHtml = '') {
 
     <?php if ($kept): ?>
     <div class="card no-print" style="border:1px solid #86efac;margin-bottom:16px">
-        <div class="card-header" style="background:#f0fdf4"><h3 style="color:#15803d"><i class="fas fa-user-check"></i> مُبقَون بعد الـ64 — محسومات التقاعد موقوفة (<?= count($kept) ?>)</h3></div>
+        <div class="card-header" style="background:#f0fdf4"><h3 style="color:#15803d"><i class="fas fa-user-check"></i> بلغوا الـ64 ومستمرّون — صندوق التعويضات / نهاية الخدمة موقوفان تلقائياً، والضمان والمالية كالمعتاد (<?= count($kept) ?>)</h3></div>
         <div class="card-body"><div class="table-wrapper"><table class="table">
             <thead><tr><th>الاسم</th><th>الفئة</th><th>العمر</th><th>تاريخ بلوغ 64</th><th>المدرسة</th><th></th></tr></thead>
             <tbody>
@@ -173,9 +174,13 @@ function renderAge64Cards($rows, $emptyHtml = '') {
                 <td><?= (int)$age ?> سنة</td>
                 <td style="white-space:nowrap"><strong style="color:#15803d"><?= $d64 ? e(displayDMY($d64)) : '—' ?></strong></td>
                 <td><?= e($r['school_name']) ?></td>
-                <td><form method="post" onsubmit="return confirm('إلغاء الإبقاء وإعادة محسومات التقاعد كالمعتاد؟')" style="margin:0">
-                    <?= csrfField() ?><input type="hidden" name="action" value="unkeep64"><input type="hidden" name="emp_id" value="<?= $r['id'] ?>">
-                    <button class="btn btn-sm btn-light"><i class="fas fa-rotate-left"></i> إلغاء الإبقاء</button></form></td>
+                <td style="white-space:nowrap">
+                    <form method="post" style="display:inline-flex;gap:4px;align-items:center;margin:0" onsubmit="return confirm('تسجيل ترك العمل بهذا التاريخ؟')">
+                        <?= csrfField() ?><input type="hidden" name="action" value="depart64"><input type="hidden" name="emp_id" value="<?= $r['id'] ?>">
+                        <input type="date" name="depart_date" value="<?= e($d64) ?>" style="padding:5px;border:1px solid #cbd5e1;border-radius:6px">
+                        <button class="btn btn-sm btn-light"><i class="fas fa-door-open"></i> تركه</button>
+                    </form>
+                    <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $r['id'] ?>" class="btn btn-sm btn-light"><i class="fas fa-user"></i> الملف</a></td>
             </tr>
             <?php endforeach; ?>
             </tbody>

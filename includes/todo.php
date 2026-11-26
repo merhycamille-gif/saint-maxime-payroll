@@ -51,7 +51,7 @@ function msaTodoItems(PDO $db, ?array $extra = null): array {
     if ($light['s1'] || $light['s2']) $t[] = ['fas fa-user-shield', 'var(--ic4)', $light['s1'] + $light['s2'], 'Suivi CNSS — à décider / à compléter', ($light['s1'] ? $light['s1'] . ' بلا ضمان بانتظار قرارك' : '') . ($light['s1'] && $light['s2'] ? ' · ' : '') . ($light['s2'] ? $light['s2'] . ' ناقصهم رقم الضمان' : ''), $B . 'pages/cnss_followup.php', 'cnss'];
     if ($light['inc'])  $t[] = ['fas fa-user-edit', 'var(--ic3)', $light['inc'], 'Dossiers incomplets', 'ملفات ناقصة بلا راتب محسوب', $B . 'index.php#homeIncBox', 'inc'];
     if ($heavy['hr'])   $t[] = ['fas fa-clock', 'var(--ic6)', $heavy['hr'], "Réductions d'heures à confirmer", 'تناقص ساعات بانتظار الإذن', $B . 'index.php', 'hr'];
-    if ($heavy['a64'])  $t[] = ['fas fa-hourglass-half', 'var(--ic2)', $heavy['a64'], 'Retraite 64 — à traiter', 'بلغوا سنّ الـ64 — قرار', $B . 'pages/retirement_64.php', 'a64'];
+    // ⚖️ (2026-11-26 «ما في داعي تسألني عن أستاذ بلغ 64»): لا مهمّة «قرار» — محسومات التقاعد تتوقّف تلقائياً من شهر بلوغ 64؛ اللائحة تبقى للعلم بصفحة Retraite 64.
     return $t;
 }
 /** يمسح كاش الجرس (بعد أي حفظ/حذف يغيّر الأعداد) */
