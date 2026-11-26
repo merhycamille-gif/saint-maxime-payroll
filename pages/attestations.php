@@ -899,7 +899,8 @@ if (!$emp):
             $basePlusEch = (float)($emp['contract_salary_lbp'] ?? 0);
         }
         $net=$basePlusEch; $netUsd=0;
-        $cnssAmt=round($basePlusEch*0.03); $schoolCnss=round($basePlusEch*0.08);
+        $cnssBaseEst=clampCnssBase($basePlusEch, 'maladie_maternite'); // ⚖️ 26/11/2026 «طبّق القانون»: التقدير أيضاً بسقف الضمان (فرع المرض والأمومة) كما المحرّك
+        $cnssAmt=round($cnssBaseEst*rateFrac('cnss_employee_rate', null, null, 3)); $schoolCnss=round($cnssBaseEst*rateFrac('cnss_employer_rate', null, null, 8));
         $salPeriodAr=currentSchoolYear(); $salPeriodLat=$salPeriodAr;
     }
     $yAr=$yFr=$yEn='';
@@ -2319,7 +2320,7 @@ if (!$emp):
                     <?php if (!$isEmploye && ($classesAr || $subjects)): ?><p><?php if ($classesAr): ?>الصفوف التي يُدرّسها: <strong><?= e($classesAr) ?></strong>. <?php endif; ?><?php if ($subjects): ?>المواد: <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
                 <?php endif; ?>
                 <?php if ($type==='salaire'): ?><p>ويبلغ راتبه الشهري<?= $isEmploye ? '' : ' (الأساس + الدرجات)' ?> <strong><?= $L ?></strong>، وصافي راتبه <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> عن <?= e($salPeriodAr) ?><?php endif; ?>.</p>
-                <?php elseif ($type==='cnss'): ?><p>وهو مسجَّل في الصندوق الوطني للضمان الاجتماعي تحت الرقم <strong><?= e($nssf) ?></strong>، على راتب شهري خاضع قدره <strong><?= $L ?></strong> (حصة الأجير 3%: <?= formatLBP($cnssAmt) ?>؛ حصة المدرسة 8%: <?= formatLBP($schoolCnss) ?>).</p>
+                <?php elseif ($type==='cnss'): ?><p>وهو مسجَّل في الصندوق الوطني للضمان الاجتماعي تحت الرقم <strong><?= e($nssf) ?></strong>، على راتب شهري خاضع قدره <strong><?= $L ?></strong> (حصة الأجير <?= e(contribPct('cnss_employee_rate') ?: '3') ?>%: <?= formatLBP($cnssAmt) ?>؛ حصة المدرسة <?= e(contribPct('cnss_employer_rate') ?: '8') ?>%: <?= formatLBP($schoolCnss) ?>).</p>
                 <?php elseif ($type==='resignation'): ?><p>وقد تقدّم <strong><?= e($nomAr) ?></strong> باستقالته من عمله في مدرستنا<?php if ($emp['hire_date']): ?> (المباشرة منذ <strong><?= $hireFmt ?></strong>)<?php endif; ?>، وقد قُبلت اعتباراً من <strong><?= $endFmt ?></strong>.</p>
                 <?php elseif ($type==='fin_de_service'): ?><p>وقد انتهت خدمة <strong><?= e($nomAr) ?></strong> في مدرستنا<?php if ($emp['hire_date']): ?>، بعد خدمة من <strong><?= $hireFmt ?></strong> حتى <strong><?= $endFmt ?></strong><?= $yAr?' ('.e($yAr).')':'' ?><?php endif; ?>، اعتباراً من <strong><?= $endFmt ?></strong>.</p>
                 <?php elseif ($type==='decharge'): ?><p>يُقرّ <strong><?= e($nomAr) ?></strong> بأنه قبض من مدرستنا كامل حقوقه ورواتبه ومستحقاته (بما فيها التعويضات وتعويض نهاية الخدمة) لغاية تاريخ <strong><?= $endFmt ?></strong>، وأنه لا يطالب المدرسة بأي حقّ أو مستحق بعد هذا التاريخ (براءة ذمة تامة).</p>
@@ -2333,7 +2334,7 @@ if (!$emp):
                     <?php if (!$isEmploye && ($classesLat || $subjects)): ?><p><?php if ($classesLat): ?>Classes enseignées : <strong><?= e($classesLat) ?></strong>. <?php endif; ?><?php if ($subjects): ?>Matières : <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
                 <?php endif; ?>
                 <?php if ($type==='salaire'): ?><p>Son salaire mensuel<?= $isEmploye ? '' : ' (base + échelon)' ?> s'élève à <strong><?= $L ?></strong>, salaire net <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> au titre de <?= e($salPeriodLat) ?><?php endif; ?>.</p>
-                <?php elseif ($type==='cnss'): ?><p>Immatriculé(e) à la CNSS sous le n° <strong><?= e($nssf) ?></strong>, sur un salaire mensuel soumis de <strong><?= $L ?></strong> (part employé 3% : <?= formatLBP($cnssAmt) ?> ; part employeur 8% : <?= formatLBP($schoolCnss) ?>).</p>
+                <?php elseif ($type==='cnss'): ?><p>Immatriculé(e) à la CNSS sous le n° <strong><?= e($nssf) ?></strong>, sur un salaire mensuel soumis de <strong><?= $L ?></strong> (part employé <?= e(contribPct('cnss_employee_rate') ?: '3') ?>% : <?= formatLBP($cnssAmt) ?> ; part employeur <?= e(contribPct('cnss_employer_rate') ?: '8') ?>% : <?= formatLBP($schoolCnss) ?>).</p>
                 <?php elseif ($type==='resignation'): ?><p><strong><?= e($nomFr) ?></strong> a présenté sa démission, acceptée à compter du <strong><?= $endFmt ?></strong>.</p>
                 <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> a cessé ses fonctions à compter du <strong><?= $endFmt ?></strong><?php if ($emp['hire_date']): ?>, après une période de service du <?= $hireFmt ?> au <?= $endFmt ?><?= $yFr?' ('.e($yFr).')':'' ?><?php endif; ?>.</p>
                 <?php elseif ($type==='decharge'): ?><p><strong><?= e($nomFr) ?></strong> reconnaît avoir perçu de notre établissement l'intégralité de ses droits et salaires (y compris indemnités et fin de service) à la date du <strong><?= $endFmt ?></strong>, et déclare n'avoir aucune réclamation envers l'établissement (reçu pour solde de tout compte).</p>
@@ -2347,7 +2348,7 @@ if (!$emp):
                     <?php if (!$isEmploye && ($classesLat || $subjects)): ?><p><?php if ($classesLat): ?>Classes taught: <strong><?= e($classesLat) ?></strong>. <?php endif; ?><?php if ($subjects): ?>Subjects: <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
                 <?php endif; ?>
                 <?php if ($type==='salaire'): ?><p>His/her monthly salary<?= $isEmploye ? '' : ' (base + increment)' ?> is <strong><?= $L ?></strong>, net salary <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> for <?= e($salPeriodLat) ?><?php endif; ?>.</p>
-                <?php elseif ($type==='cnss'): ?><p>Registered with the National Social Security Fund under no. <strong><?= e($nssf) ?></strong>, on a monthly contributory salary of <strong><?= $L ?></strong> (employee share 3%: <?= formatLBP($cnssAmt) ?>; employer share 8%: <?= formatLBP($schoolCnss) ?>).</p>
+                <?php elseif ($type==='cnss'): ?><p>Registered with the National Social Security Fund under no. <strong><?= e($nssf) ?></strong>, on a monthly contributory salary of <strong><?= $L ?></strong> (employee share <?= e(contribPct('cnss_employee_rate') ?: '3') ?>%: <?= formatLBP($cnssAmt) ?>; employer share <?= e(contribPct('cnss_employer_rate') ?: '8') ?>%: <?= formatLBP($schoolCnss) ?>).</p>
                 <?php elseif ($type==='resignation'): ?><p><strong><?= e($nomFr) ?></strong> has submitted his/her resignation, accepted effective <strong><?= $endFmt ?></strong>.</p>
                 <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> ended his/her duties effective <strong><?= $endFmt ?></strong><?php if ($emp['hire_date']): ?>, after a service period from <?= $hireFmt ?> to <?= $endFmt ?><?= $yEn?' ('.e($yEn).')':'' ?><?php endif; ?>.</p>
                 <?php elseif ($type==='decharge'): ?><p><strong><?= e($nomFr) ?></strong> acknowledges having received from our establishment all of his/her dues and salaries (including allowances and end-of-service) as of <strong><?= $endFmt ?></strong>, and declares having no claim whatsoever against the establishment (final discharge / receipt in full).</p>

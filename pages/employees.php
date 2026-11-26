@@ -3036,10 +3036,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
 
 <?php
 // خريطة السلسلة (درجة → راتب) للإصدار الساري — لعرض الراتب فوراً عند اختيار الدرجة
-$scaleMap = [];
-foreach ($db->query("SELECT grade, new_salary_2017 FROM salary_scale_2017 WHERE version_id = " . (int)scaleVersionIdAsOf() . " ORDER BY grade")->fetchAll() as $sc) {
-    $scaleMap[(int)$sc['grade']] = (float)$sc['new_salary_2017'];
-}
+$scaleMap = scaleSalaryMap();
 ?>
 <script>
 var SALARY_SCALE = <?= json_encode($scaleMap) ?>;

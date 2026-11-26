@@ -621,7 +621,7 @@ function reportDocThumb($path) {
         <?php
         // سلسلة 2017: الراتب حسب الدرجة (لعمود الراتب)
         $scaleMap = [];
-        foreach ($db->query("SELECT grade, new_salary_2017 FROM salary_scale_2017 WHERE version_id = 1") as $sc) $scaleMap[(int)$sc['grade']] = (float)$sc['new_salary_2017'];
+        $scaleMap = scaleSalaryMap();
         // آخر راتب محسوب لكل موظف (لأعمدة الإضافي/المكافأة/النقل + أساس الموظف الإداري الفعلي)
         // 🔴 يُفضَّل آخر راتب **ضمن السنة الدراسية النشطة**: السنوات المولّدة مسبقاً (المستقبلية)
         // بلا إضافي/نقل، فأخذ «آخر راتب بالمطلق» كان يُظهر أصفاراً مع أن السنة المعروضة فيها القيم.

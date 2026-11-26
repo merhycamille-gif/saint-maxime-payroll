@@ -283,7 +283,7 @@ if ($report === 'monthly_summary') {
     $st->execute($yp);
     $data = $st->fetchAll();
     $scaleMap = [];
-    foreach ($db->query("SELECT grade,new_salary_2017 FROM salary_scale_2017 WHERE version_id=1") as $sc) $scaleMap[(int)$sc['grade']] = (float)$sc['new_salary_2017'];
+    $scaleMap = scaleSalaryMap();
     // آخر راتب محسوب لكل موظف — للأساس الفعلي + الإضافي/المكافأة/النقل/المركّب (نفس الشاشة).
     // 🔴 يُفضَّل آخر راتب **ضمن السنة الدراسية النشطة** — السنوات المولّدة مسبقاً بلا إضافي/نقل.
     $bonusSy = activeSchoolYear();

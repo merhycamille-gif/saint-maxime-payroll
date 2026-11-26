@@ -7235,6 +7235,8 @@ function rateHead(string $which, $month = null, $year = null): string {
  *  بالبطاقة السنوية وبكل التقارير: الضمان على الأجير 3٪، على المدرسة 7٪ مرض وأمومة، نهاية الخدمة 8.5٪، تعويضات عائلية 6٪، صندوق التعويضات 6٪»):
  *  النسبة لا تُكتب رقماً ثابتاً بالكود بل تُقرأ من جدول «النِّسَب حسب التاريخ» (rate_history) بتاريخ شهر التقرير أو آخر شهر بالسنة الدراسية —
  *  نفس المفاتيح التي يحسب بها المحرّك، فالعنوان والحساب لا يفترقان. الضريبة (شطور) ودرجة/نصف راتب (ليست نسبة) بلا نسبة بقراره. */
+/** 🔒 (2026-11-26 المصدر الواحد) خريطة السلسلة درجة ⇒ راتب للإصدار الساري بتاريخ (الافتراضي اليوم). */
+function scaleSalaryMap($asOfDate = null): array { $m = []; foreach (getDB()->query("SELECT grade, new_salary_2017 FROM salary_scale_2017 WHERE version_id = " . (int)scaleVersionIdAsOf($asOfDate) . " ORDER BY grade") as $r) $m[(int)$r['grade']] = (float)$r['new_salary_2017']; return $m; }
 function contribRateDefaults(): array {
     return ['cnss_employee_rate' => 3, 'cnss_employer_rate' => 8, 'end_of_service_rate' => 8.5, 'family_compensation_rate' => 6, 'eoc_employee_rate' => 6, 'eoc_employer_rate' => 6];
 }

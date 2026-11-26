@@ -71,7 +71,7 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026', array $schoolIds = []
     $add('base_scale', 'أستاذ ملاك أساسه بعد التدرّج لا يطابق السلسلة عند درجته (الدرجة الكاملة)', $q("
         SELECT $nm nm, ms.month, ms.grade_at_month g, ms.base_plus_echelon_lbp b, sc.new_salary_2017 s
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        JOIN salary_scale_2017 sc ON sc.version_id=1 AND sc.grade=FLOOR(ms.grade_at_month)
+        JOIN salary_scale_2017 sc ON sc.version_id=" . (int)scaleVersionIdAsOf() . " AND sc.grade=FLOOR(ms.grade_at_month)
         WHERE e.is_deleted=0 AND e.employee_type='enseignant_titulaire' AND ms.school_year=? AND ms.grade_at_month IS NOT NULL
           AND ms.base_plus_echelon_lbp <> sc.new_salary_2017
           AND (e.titularization_date IS NULL OR CONCAT(ms.year,'-',LPAD(ms.month,2,'0'),'-01') >= e.titularization_date) -- (2026-09-17) أشهر ما قبل دخول الملاك (كان متعاقداً بأجر اتفاق) ليست على السلسلة — ريتا طنوس 2025-2026

@@ -174,7 +174,7 @@ function complianceItems(PDO $db, string $sy): array {
     // ── 2) أساس الراتب ≠ السلسلة عند الدرجة (الملاك، الدرجة الكاملة) ──
     foreach ($q("SELECT e.*, ms.month, ms.year, ms.base_plus_echelon_lbp bpe, ms.grade_at_month g, sc.new_salary_2017 scale_base
         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
-        JOIN salary_scale_2017 sc ON sc.version_id = 1 AND sc.grade = FLOOR(ms.grade_at_month)
+        JOIN salary_scale_2017 sc ON sc.version_id = " . (int)scaleVersionIdAsOf() . " AND sc.grade = FLOOR(ms.grade_at_month)
         WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND ms.school_year = ? AND ms.grade_at_month IS NOT NULL
           AND ms.base_plus_echelon_lbp <> sc.new_salary_2017" . $sc . "
           AND NOT (e.last_name_ar LIKE '%حليحل%' AND e.first_name_ar IN ('ريتا','ماريا') AND e.father_name_ar IN ('مارون','الياس')) /* استثناء موثّق: كشفه بالمليم (سلفة) 2026-08-27 */
@@ -486,7 +486,7 @@ function complianceItems(PDO $db, string $sy): array {
           AND m.id = (SELECT m2.id FROM monthly_salaries m2 WHERE m2.employee_id = e.id AND m2.school_year = ? AND m2.prime_fixe_lbp > 0 AND m2.caisse_amount_lbp > 0 ORDER BY m2.year DESC, m2.month DESC LIMIT 1)
         WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND COALESCE(e.eoc_subject,1) = 1 AND COALESCE(e.eoc_includes_extra,0) = 0" . $sc . $yf . "
         ORDER BY e.school_id, e.id", array_merge([$sy, $sy], $yp)) as $r) {
-        $now = (int)$r['caisse']; $full = (int)round(((float)$r['bpe'] + (float)$r['prime']) * 0.06);
+        $now = (int)$r['caisse']; $full = (int)round(((float)$r['bpe'] + (float)$r['prime']) * rateFrac('eoc_employee_rate', (int)$r['month'], (int)$r['year'], 6));
         if ($full <= $now) continue; // الصندوق المخزّن يشمل الإضافي فعلاً (قيم مثبّتة يدوياً) — لا فرق
         $add('eoc_base_only', $r,
             'الصندوق 6٪ بشهر ' . complianceMonthLabel((int)$r['month'], (int)$r['year']) . ' = ' . complianceFmt($now) . ' (على الأساس ' . complianceFmt($r['bpe']) . ' وحده) بينما مع الأجر الإضافي ' . complianceFmt($r['prime']) . ' يكون ' . complianceFmt($full) . ' — صافيه أعلى بنحو ' . complianceFmt($full - $now) . ' شهرياً',
