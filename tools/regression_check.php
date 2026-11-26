@@ -8306,6 +8306,17 @@ if ($t173) { $tid173 = (int)$t173['id']; $tm173 = (int)$t173['month']; $ty173 = 
     $c173('titulaire-63>0', $tB && (int)$tB['caisse_amount_lbp'] > 0 && (int)$tB['school_eoc_6_lbp'] > 0);
     $c173('titulaire-birth-restored', $db->query("SELECT birth_date FROM employees WHERE id = $tid173")->fetchColumn() === $tOrig);
 } else $c173('no-titulaire-data', false);
+// 🔗 (2026-11-26 «بس تصلّح شغلة بالأساس لحالها تتصلّح بكل البرنامج وبكل التقارير»): سنّ الـ64 داخل المصدر الواحد monthSubjectTo('eoc') — والبوّابة والشاشات تمرّ منه لا من المفتاح القديم
+$c173('single-source', !monthSubjectTo(['employee_type' => 'enseignant_titulaire', 'birth_date' => '1962-07-20'], 'eoc', 2026, 7) && monthSubjectTo(['employee_type' => 'enseignant_titulaire', 'birth_date' => '1962-07-20'], 'eoc', 2026, 6)
+    && monthSubjectTo(['employee_type' => 'enseignant_titulaire', 'birth_date' => '1962-07-20'], 'cnss', 2026, 7) && monthSubjectTo(['employee_type' => 'enseignant_titulaire', 'birth_date' => '1962-07-20'], 'finance', 2026, 7)
+    && strpos((string)file_get_contents($PROJ . '/includes/eoc_portal.php'), "if (!monthSubjectTo(\$e, 'eoc', (int)\$y, (int)\$m)) continue;") !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'type="checkbox" name="keep_working_past_64"') === false
+    && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), "\$yn(\$emp['keep_working_past_64']") === false
+    && strpos((string)file_get_contents($PROJ . '/pages/employee_fiche.php'), "(int)(\$emp['keep_working_past_64'] ?? 0) === 1") === false);
+// 🔒 قفل «المصدر الواحد» (tools/regles_uniques.php): لا قاعدة مكتوبة خارج مصدرها — وإلا لا نشر
+require_once $PROJ . '/tools/regles_uniques.php';
+$ru173 = reglesUniquesVerifier($PROJ);
+check('🔒 قفل المصدر الواحد (2026-11-26 «بس تصلّح شغلة بالأساس، لحالها تتصلّح بكل البرنامج وبكل التقارير»): كل قاعدة بالسجلّ مكتوبة بمصدرها فقط', !$ru173, $ru173 ? count($ru173) . ' خارج المصدر — أوّلها ' . $ru173[0][1] . ':' . $ru173[0][2] . ' [' . $ru173[0][0] . ']' : count(reglesUniquesRegistre()) . ' قاعدة');
 // لا «قرار مطلوب»: بطاقة الـ64 بلا زرّ «يبقى»، ولا مهمّة «قرار» بلائحة الشغل
 $c173('no-decision-ui', strpos((string)file_get_contents($PROJ . '/includes/age64.php'), '$need = [];') !== false && strpos((string)file_get_contents($PROJ . '/includes/todo.php'), "'بلغوا سنّ الـ64 — قرار'") === false);
 check('⚖️ موظف قانون العمل بعد 64 لا يخضع لنهاية الخدمة (2026-09-26): المحرّك تلقائي بلا مفتاح (٨.٥٪ = 0 من شهر بلوغه، والعائلي ٦٪ يبقى) + الملاك بقرار الإبقاء كما كان + الشفاء يصفّر المخزّن غير المحميّ + العدّ بالتسوية = الخاضعون فعلاً', $ok173, implode(' · ', $why173) ?: 'ok');

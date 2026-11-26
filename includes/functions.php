@@ -62,7 +62,7 @@ if (!function_exists('empFullNameFr')) {
         $f = [
             ['on' => (int)($e['cnss_subject'] ?? 1) === 1, 'fr' => 'CNSS',   'ar' => 'ضمان'],
             ['on' => (int)($e['tax_subject'] ?? 1) === 1,  'fr' => 'Impôt',  'ar' => 'ضريبة'],
-            ['on' => (int)($e['eoc_subject'] ?? 1) === 1,  'fr' => 'Caisse', 'ar' => 'صندوق'],
+            ['on' => (int)($e['eoc_subject'] ?? 1) === 1 && monthSubjectTo($e, 'eoc', (int)date('Y'), (int)date('n')),  'fr' => 'Caisse', 'ar' => 'صندوق'],   // 26/11: ملاك بلغ 64 = لا صندوق
         ];
         $on = array_values(array_filter($f, fn($x) => $x['on']));
         if (count($on) === 3) return 'Oui / نعم';
@@ -1229,6 +1229,8 @@ function leftDateOfFor(array $emp, string $kind): ?string {
 }
 /** هل شهر الراتب (year,month) ما زال خاضعاً لجهة معيّنة؟ شهر الترك نفسه يبقى خاضعاً، ويتوقّف من الشهر التالي */
 function monthSubjectTo(array $emp, string $kind, int $year, int $month): bool {
+    // ⚖️ (2026-11-26 «بس تصلّح شغلة بالأساس، لحالها تتصلّح بكل البرنامج وبكل التقارير»): سنّ الـ64 جزء من المصدر الواحد — أيّ شاشة/تقرير/تصريح يسأل «خاضع للصندوق؟» يمرّ من هنا.
+    if ($kind === 'eoc' && function_exists('titulaireExemptEoc64') && titulaireExemptEoc64($emp, $month, $year)) return false;   // ⚖️ ملاك بلغ 64
     $ld = leftDateOfFor($emp, $kind);
     if ($ld === null) return true;
     return sprintf('%04d-%02d-01', $year, $month) <= $ld;
@@ -2503,6 +2505,10 @@ function employeExemptEos64(array $emp, int $month, int $year): bool {
  * أستاذ الملاك ببلوغه 64 (بنهاية شهر الراتب) ⇒ صندوق التعويضات ٦٪ عنه وعن المدرسة (+ حسم الدرجة) يتوقّف **تلقائياً بالقانون** من ذلك الشهر —
  * بلا قرار «يبقى» ولا مفتاح keep_working_past_64 (كما الموظف مع نهاية الخدمة ٨,٥٪). الضمان وضريبة الدخل يبقيان. المصدر الواحد للمحرّك وللشفاء.
  */
+/** تاريخ بلوغ الـ64 (Y-m-d) أو '' إن لا تاريخ ولادة صالح. المصدر الواحد لكل شاشة تعرض هذا التاريخ. */
+function emp64Date(array $emp): string { $b = (string)($emp['birth_date'] ?? ''); return ($b !== '' && $b > '1900-01-01') ? date('Y-m-d', strtotime($b . ' +64 years')) : ''; }
+/** بلغ الـ64 بتاريخ معيّن (افتراضياً اليوم)؟ المصدر الواحد للشاشات والإفادات (العرض) — الحساب يمرّ من titulaireExemptEoc64 / employeExemptEos64. */
+function empPast64(array $emp, ?string $date = null): bool { $d = emp64Date($emp); return $d !== '' && $d <= ($date ?: date('Y-m-d')); }
 function titulaireExemptEoc64(array $emp, int $month, int $year): bool {
     if (($emp['employee_type'] ?? '') !== 'enseignant_titulaire') return false;
     $age = ageOnDate($emp['birth_date'] ?? '', date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $year, $month))));

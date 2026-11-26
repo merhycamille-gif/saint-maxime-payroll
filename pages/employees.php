@@ -467,7 +467,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'has_13th_month' => isset($_POST['has_13th_month']) ? 1 : 0,
         'm13_include_extra' => isset($_POST['m13_include_extra']) ? 1 : 0,
         'm13_include_aide' => isset($_POST['m13_include_aide']) ? 1 : 0,
-        'keep_working_past_64' => isset($_POST['keep_working_past_64']) ? 1 : 0,
         // 🧾 (2026-10-12) نصف الراتب لصندوق التعويضات بت1 من سنة يحدّدها — اختياري: الخانة مطفأة أو السنة فارغة ⇒ NULL
         'eoc_half_salary_year' => (isset($_POST['eoc_half_salary_on']) && preg_match('/^\d{4}$/', (string)($_POST['eoc_half_salary_year'] ?? ''))) ? (int)$_POST['eoc_half_salary_year'] : null,
         // 🏛️💼 (2026-11-08) بيانات الأستاذ عند صندوق التعويضات بصيغة منصّته (فارغ = يُستنتَج)
@@ -542,10 +541,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     try {
         if (!msaHasCol($db, 'employees', 'classes_taught')) unset($data['classes_taught']);
     } catch (Exception $e) { unset($data['classes_taught']); }
-    // عمود keep_working_past_64 قد لا يكون موجوداً قبل migration 017 أونلاين → أزِله من الحفظ لتفادي الكسر
-    try {
-        if (!msaHasCol($db, 'employees', 'keep_working_past_64')) unset($data['keep_working_past_64']);
-    } catch (Exception $e) { unset($data['keep_working_past_64']); }
     // 🧾 عمود eoc_half_salary_year يتركّب ذاتياً (ensureEmployeeFlagColumns) — حارس إضافي كي لا يكسر الحفظ
     try {
         if (!msaHasCol($db, 'employees', 'eoc_half_salary_year')) unset($data['eoc_half_salary_year']);
@@ -631,13 +626,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 $brN = cnssBranchesApplyStored($db, (int)$id, $brWas !== null && !$brWas['family'] && cnssBranchOn($brNowEmp, 'family'), $brWas !== null && !$brWas['eos'] && cnssBranchOn($brNowEmp, 'eos'));
                 if ($brN && !empty($_SESSION['flash']['msg'])) $_SESSION['flash']['msg'] .= ' — ⚖️ فروع الضمان طُبّقت على ' . $brN . ' شهراً بكل السنين';
             } catch (Throwable $t) {}
-            // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
-            // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
-            if (!empty($data['keep_working_past_64'])) {
-                foreach (array_filter([activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()]) as $sy) { // 📅 (2026-09-23 قراره «بس تغيّر شغلة لازم تتغيّر بس بالسنة اللي بتغيّر فيها») السنة المعروضة فقط
-                    if ($sy) recalcEmployeeYear($id, $sy);
-                }
-            }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
             msaNotePaidSkipped((int)$id); // 🔔 أشهر مدفوعة بسنة سابقة لم تُمسّ ⇒ تنبيه + كبسة تطبيق صريح بالملف
             handleEmployeeUploads($db, $id); // رفع الصورة والوثائق (يحدّث الرسالة بعدد الملفات)
@@ -756,13 +744,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 $brN = cnssBranchesApplyStored($db, (int)$id, $brWas !== null && !$brWas['family'] && cnssBranchOn($brNowEmp, 'family'), $brWas !== null && !$brWas['eos'] && cnssBranchOn($brNowEmp, 'eos'));
                 if ($brN && !empty($_SESSION['flash']['msg'])) $_SESSION['flash']['msg'] .= ' — ⚖️ فروع الضمان طُبّقت على ' . $brN . ' شهراً بكل السنين';
             } catch (Throwable $t) {}
-            // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
-            // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
-            if (!empty($data['keep_working_past_64'])) {
-                foreach (array_filter([activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()]) as $sy) { // 📅 (2026-09-23 قراره «بس تغيّر شغلة لازم تتغيّر بس بالسنة اللي بتغيّر فيها») السنة المعروضة فقط
-                    if ($sy) recalcEmployeeYear($id, $sy);
-                }
-            }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
             // 🧾 (2026-10-12) تغيّرت سنة «نصف الراتب لصندوق التعويضات» ⇒ تشرين الأول المعنيّ وحده يتبع (السنة الدراسية القديمة والجديدة)؛
             //    الأشهر المدفوعة تبقى محمية بنفس آلية recalcEmployeeYear (سؤال نعم/لا + التنبيه الأصفر)
@@ -1431,7 +1412,7 @@ $employee = [
     'payment_months_per_year' => 12, 'pay_from_month' => 10, 'pay_to_month' => 9, 'has_13th_month' => 0, 'm13_include_extra' => 1, 'm13_include_aide' => 1, // 📆 12 = ت1 ← أيلول للجميع (2026-09-20) · 🎁 (2026-10-19) خيارا شهر التعويض مشغَّلان افتراضياً
     'tax_subject' => 1, 'apply_family_deduction' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
-    'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0, 'eoc_half_salary_year' => null,
+    'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'eoc_half_salary_year' => null,
     'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0, 'family_allowance_spouse_from' => '', 'family_allowance_spouse_to' => '', 'family_allowance_children_from' => '', 'family_allowance_children_to' => '',
     'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'grant_spouse_addition' => 0, 'grant_children_addition' => 0,
     'transport_daily_amount' => 0, 'transport_daily_currency' => 'LBP', 'transport_days_per_week' => 0, 'transport_weeks' => 4,
@@ -1556,7 +1537,7 @@ if ($id > 0):
     elseif ((float)($employee['base_salary_usd'] ?? 0) > 0) { $hxBase = '$' . number_format((float)$employee['base_salary_usd']); $hxBaseNote = 'راتب متّفق بالدولار'; }
     elseif ((float)($employee['contract_salary_lbp'] ?? 0) > 0) { $hxBase = formatLBP((float)$employee['contract_salary_lbp']); $hxBaseNote = 'راتب متّفق'; }
     $hxAge = ''; $hx64 = '';
-    if (!empty($employee['birth_date']) && $employee['birth_date'] !== '0000-00-00') { try { $bd = new DateTime($employee['birth_date']); $hxAge = (string)$bd->diff(new DateTime())->y; $hx64 = (clone $bd)->modify('+64 years')->format('d/m/Y'); } catch (Throwable $e) {} }
+    if (!empty($employee['birth_date']) && $employee['birth_date'] !== '0000-00-00') { try { $bd = new DateTime($employee['birth_date']); $hxAge = (string)$bd->diff(new DateTime())->y; $hx64 = date('d/m/Y', strtotime(emp64Date((array)$employee))); } catch (Throwable $e) {} }
     $hxLast = ''; try { $hxNowYm = (int)date('Y') * 100 + (int)date('n'); $hxQ = $db->prepare("SELECT month, year FROM monthly_salaries WHERE employee_id = ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) AND (year * 100 + month) <= ? ORDER BY year DESC, month DESC LIMIT 1"); $hxQ->execute([(int)$id, $hxNowYm]); if ($hxR = $hxQ->fetch(PDO::FETCH_ASSOC)) $hxLast = monthName((int)$hxR['month'], 'ar') . ' ' . (int)$hxR['year']; } catch (Throwable $e) {}
     $hxHours = nfc((float)($employee['hours_per_week'] ?? 0), 1, true);
     $hxLaw = ($hrMsg && !empty($hrMsg['reduction']) && $hrMsg['reduction'] > 0) ? (int)$hrMsg['lawHours'] : 0;
@@ -2944,28 +2925,23 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
 
                 <?php
                     $empAge = ageOnDate($employee['birth_date'] ?? '');
-                    $emp64Date = '';
-                    if ($empAge !== null && ($eb = date_create(substr((string)$employee['birth_date'], 0, 10)))) {
-                        $emp64Date = $eb->modify('+64 years')->format('Y-m-d');
-                    }
+                    $emp64Date = emp64Date((array)$employee);
                 ?>
                 <div class="card" style="margin-top:16px;border:1px solid #fed7aa;">
                     <div class="card-header" style="background:#fff7ed;">
                         <h3 style="color:#b45309;">
                             <span dir="ltr"><i class="fas fa-hourglass-half"></i> Âge de la retraite (64 ans)
-                                <?php if ($empAge !== null): ?><span class="badge" style="background:<?= $empAge >= 64 ? '#b45309' : '#64748b' ?>;color:#fff">العمر: <?= (int)$empAge ?> سنة</span><?php endif; ?>
+                                <?php if ($empAge !== null): ?><span class="badge" style="background:<?= empPast64((array)$employee) ? '#b45309' : '#64748b' ?>;color:#fff">العمر: <?= (int)$empAge ?> سنة</span><?php endif; ?>
                                 <?php if ($emp64Date): ?><span class="badge" style="background:#b45309;color:#fff">تاريخ بلوغ 64: <?= e(displayDMY($emp64Date)) ?></span><?php endif; ?>
                             </span>
                             <div style="font-size:0.85em;font-weight:600;opacity:0.9">بلوغ سنّ الـ64</div>
                         </h3>
                     </div>
                     <div class="card-body">
-                        <label class="d-flex justify-between align-center mb-3">
-                            <span><strong>الإبقاء على العمل بعد الـ64 — وقف محسومات التقاعد</strong> / Maintenu après 64 ans (arrêt des retenues de retraite)</span>
-                            <label class="switch"><input type="checkbox" name="keep_working_past_64" value="1" <?= !empty($employee['keep_working_past_64']) ? 'checked' : '' ?>><span class="slider"></span></label>
-                        </label>
+                        <?php /* ⚖️ 26/11/2026: تلقائياً بالقانون — لا مفتاح. */ $a64d = emp64Date((array)$employee); $a64ok = empPast64((array)$employee, date('Y-m-t')); ?>
+                        <p style="margin:0 0 6px"><strong><?= $a64ok ? 'بلغ الـ64 بتاريخ ' . e(displayDMY($a64d)) . ' — محسومات التقاعد موقوفة تلقائياً من ذلك الشهر' : ($a64d !== '' ? 'يبلغ الـ64 بتاريخ ' . e(displayDMY($a64d)) : 'تاريخ الولادة غير مسجّل') ?></strong></p>
                         <p style="font-size:12px;color:var(--gray-600);margin:0">
-                            عند تفعيله لمن بلغ 64 سنة: تُوقَف تلقائياً — للأستاذ <strong>الملاك</strong>: صندوق التعويضات ٦٪ <strong>عنه وعن المدرسة</strong>؛ وللموظف: نهاية الخدمة ٨,٥٪ (المدرسة). يبدأ الإعفاء من <strong>شهر بلوغه 64</strong> فقط (الأشهر السابقة تبقى كما هي). إن كنت <strong>لا تريد إبقاءه</strong>، سجّل تاريخ الترك في أعلى البطاقة بدل ذلك.
+                            تلقائياً بالقانون — لا مفتاح ولا قرار: من <strong>شهر بلوغ 64</strong> تتوقّف للأستاذ <strong>الملاك</strong> محسومات صندوق التعويضات ٦٪ <strong>عنه وعن المدرسة</strong>، وللموظف نهاية الخدمة ٨,٥٪ (المدرسة). الضمان وضريبة الدخل يبقيان. الأشهر السابقة تبقى كما هي. إن ترك العمل يُسجَّل تاريخ الترك.
                         </p>
                     </div>
                 </div>

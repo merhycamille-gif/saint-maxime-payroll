@@ -403,7 +403,7 @@ $S['s_job'] = [
     [$t('titul'), shownTitularizationDate($emp) ? formatDate(shownTitularizationDate($emp)) : ''],
     [$t('confirm'), ($emp['tenure_confirmation_date'] && shownTitularizationDate($emp) !== '') ? formatDate($emp['tenure_confirmation_date']) : ''],
     [$t('status'), $statusLbl],
-    [$t('after64'), (int)($emp['keep_working_past_64'] ?? 0) === 1 ? $t('yes') : ''],
+    [$t('after64'), (empPast64($emp) && ($emp['status'] ?? '') === 'actif') ? $t('yes') : ''],   // 26/11/2026: حسب العمر (تلقائي)
 ];
 $S['s_off'] = [
     [$t('cnss'), trim((string)($emp['nssf_number'] ?? '')) !== '' ? cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '') : ''],   // 🪪 (2026-11-18) بلا رقم ضمان = السطر لا يُطبع (كان يطبع سنة الولادة وحدها «2002» كأنّها الرقم)

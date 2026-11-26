@@ -176,7 +176,7 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
         foreach ($grades as $g) { if ((float)$g['grade_before'] == 0 && $g['reason'] === 'titularization') continue; $tl[] = ['d' => $g['change_date'], 'c' => 'g', 't' => 'درجة: ' . nfc((float)$g['grade_before'], 1, true) . ' ← ' . nfc((float)$g['grade_after'], 1, true) . ' — ' . e($g['notes'] ?: $g['reason']) . ((int)($g['counted'] ?? 1) === 0 ? ' (غير محتسبة)' : '') . (!empty($g['user_edited']) ? ' ✍️' : '')]; }
         foreach ($decisions as $dc) { $tl[] = ['d' => substr((string)$dc['decided_at'], 0, 10), 'c' => 'd', 't' => e(($dc['decision'] === 'auto' ? 'تلقائياً: ' : ($dc['decision'] === 'approved' ? 'موافقة: ' : 'رفض: ')) . mb_substr((string)$dc['violation'], 0, 140))]; }
         foreach (['left_date_all' => 'ترك من الكل (نهائي)', 'left_date_cnss' => 'ترك الضمان', 'left_date_finance' => 'ترك المالية', 'left_date_eoc' => 'ترك صندوق التعويضات'] as $k => $l) if (!empty($emp[$k]) && $emp[$k] >= '1900-01-01') $tl[] = ['d' => $emp[$k], 'c' => 'x', 't' => $l];
-        if (!empty($emp['keep_working_past_64'])) $tl[] = ['d' => date('Y-m-d', strtotime(($emp['birth_date'] ?: '1900-01-01') . ' +64 years')), 'c' => 'd', 't' => 'بلوغ 64 مع قرار الإبقاء'];
+        if (empPast64($emp)) $tl[] = ['d' => emp64Date($emp), 'c' => 'd', 't' => 'بلوغ 64 — محسومات التقاعد موقوفة تلقائياً من هذا الشهر'];   // 26/11/2026
         usort($tl, fn($a, $b) => strcmp($a['d'], $b['d']));
         // مجموع كل السنين
         $grand = ['net' => 0, 'due' => 0, 'caisse' => 0, 'cnss' => 0, 'tax' => 0, 'fam' => 0, 'n' => 0, 'paid' => 0];

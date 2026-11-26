@@ -263,7 +263,7 @@ if ($emp && !empty($_GET['dossier'])):
             $w .= $row2('تاريخ الملاك', shownTitularizationDate($emp) ? formatDate(shownTitularizationDate($emp)) : '');
             $w .= $row2('تاريخ تثبيت الملاك', $emp['tenure_confirmation_date'] ? formatDate($emp['tenure_confirmation_date']) : '');
             $w .= $row2('الحالة', employeeStatusLabel($emp['status'])['label']);
-            $w .= $row2('استمرار العمل بعد ٦٤', $yn($emp['keep_working_past_64']??0));
+            $w .= $row2('استمرار العمل بعد ٦٤', $yn((empPast64($emp) && ($emp['status'] ?? '') === 'actif') ? 1 : 0));   // 26/11/2026: حسب العمر (تلقائي)
 
             // أرقام رسمية وتواريخ الترك
             $o  = $row2('رقم الضمان (CNSS)', cnssWithBirthYear($emp['nssf_number']??'', $emp['birth_date']??'', ''));
