@@ -182,15 +182,18 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026', array $schoolIds = []
     try {
         $pastZero = (function_exists('currentSchoolYear') && strcmp($sy, (string)currentSchoolYear()) < 0)
             ? " AND ms.net_salary_lbp = 0 AND ms.total_due_lbp = 0 AND ms.base_plus_echelon_lbp = 0 AND (ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) = 0" : '';
-        $add('pay_period_rows', 'شهر غير مدفوع مخزّن خارج الفترة المدفوعة بملف الموظف (من شهر ← إلى شهر)', $q("
-            SELECT CONCAT($nm,' (',GROUP_CONCAT(CONCAT(ms.month,'/',ms.year) ORDER BY ms.year, ms.month),')') nm
+        // 🔒 26/11/2026 المصدر الواحد: «الفترة المدفوعة» تُسأل من paidMonthsFor() (لا نسخة SQL عن القاعدة).
+        [$ppY1, $ppY2] = array_map('intval', explode('-', $sy) + [0, 0]); $ppG = []; $ppIn = [];
+        foreach ($q("
+            SELECT $nm nm, ms.employee_id eid, ms.month, ms.year, e.pay_from_month, e.pay_to_month, e.payment_months_per_year
             FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-            WHERE e.is_deleted=0 AND ms.school_year=? AND COALESCE(ms.is_paid,0)=0 AND COALESCE(ms.is_indemnity_month,0)=0
-              AND NOT (((ms.month+2)%12) BETWEEN ((e.pay_from_month+2)%12) AND
-                   (CASE WHEN e.pay_from_month=10 AND e.pay_to_month=9 AND e.payment_months_per_year=10 THEN 9
-                         WHEN e.pay_from_month=10 AND e.pay_to_month=9 AND e.payment_months_per_year=11 THEN 10
-                         ELSE GREATEST((e.pay_to_month+2)%12, (e.pay_from_month+2)%12) END))$pastZero
-            GROUP BY ms.employee_id", [$sy]));
+            WHERE e.is_deleted=0 AND ms.school_year=? AND COALESCE(ms.is_paid,0)=0 AND COALESCE(ms.is_indemnity_month,0)=0$pastZero
+            ORDER BY ms.employee_id, ms.year, ms.month", [$sy]) as $ppR) {
+            $ppE = (int)$ppR['eid'];
+            if (!isset($ppIn[$ppE])) { $ppIn[$ppE] = []; foreach (paidMonthsFor($ppR, $ppY1, $ppY2) as $ppM) $ppIn[$ppE][(int)$ppM[0]] = true; }
+            if (!isset($ppIn[$ppE][(int)$ppR['month']])) { $ppG[$ppE]['nm'] = $ppR['nm']; $ppG[$ppE]['m'][] = $ppR['month'] . '/' . $ppR['year']; }
+        }
+        $add('pay_period_rows', 'شهر غير مدفوع مخزّن خارج الفترة المدفوعة بملف الموظف (من شهر ← إلى شهر)', array_values(array_map(fn($g) => ['nm' => $g['nm'] . ' (' . implode(',', $g['m']) . ')'], $ppG)));
     } catch (Throwable $t) { $add('pay_period_rows', 'شهر غير مدفوع مخزّن خارج الفترة المدفوعة بملف الموظف (من شهر ← إلى شهر)', []); /* دمب قديم بلا أعمدة الفترة */ }
 
 

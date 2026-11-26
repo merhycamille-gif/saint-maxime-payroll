@@ -19,6 +19,9 @@ function reglesUniquesRegistre(): array {
         ['نِسَب قانونية مكتوبة باليد (0.06 / 0.03 / 0.08 / 0.085)', '/\*\s*0\.(06|03|08|085)\b|\*\s*(6|3|8|8\.5)\s*\/\s*100\b/', [$F, $C], 'rateFrac() ⇐ «النِّسَب حسب التاريخ»'],
         ['إصدار سلسلة الرواتب مثبَّت باليد', '/version_id\s*=\s*1\b/', [$F, $C, 'pages/salary_scales.php'], 'scaleVersionIdAsOf() · scaleSalaryMap() · scaleSalaryLBP()'],
         ['عرض «خاضع لصندوق التعويضات» من العمود مباشرة', '/\$\w+\[.eoc_subject.\]\s*(\?\?\s*\d\s*)?\)?\s*(\?|===|==|,)/', [$F, $C, 'pages/employees.php', 'includes/cadre_due.php', 'pages/teacher_form.php'], 'empEocSubjectNow() · monthSubjectTo(eoc)'],
+        ['الفترة المدفوعة (من شهر ← إلى شهر)', '/pay_(from|to)_month\s*\+\s*2\s*\)\s*%\s*12|pay_(from|to)_month[\'"]?\]?\s*(<|>|<=|>=)\s|payment_months_per_year\s*=\s*1[01]\b/', [$F, $C, 'pages/employees.php', 'includes/heal_cleanup_20261102.php'], 'paidMonthsFor() · paidPeriodLabel()'],
+        ['نافذة أشهر النقل وقيمة النقل القانونية', '/getSetting\(\s*[\'"]transport_/', [$F, $C, 'pages/settings.php'], 'transportMonthActive() · transportDailyLawForMonth() · transportDailyEffective()'],
+        ['التعويض العائلي حسب التاريخ', '/FROM\s+family_allowance_changes\b(?!\))/i', [$F, $C], 'familyAllowanceForMonth() · familyAllowanceKindAmount()'],
         ['شطور ضريبة الدخل', '/FROM\s+tax_brackets\b/i', [$F, $C, 'pages/settings.php', 'pages/state_laws.php', 'pages/tax_brackets.php'], 'دالّة الضريبة بالمحرّك'],
         ['فروع الضمان حسب الجنسيّة (غير اللبناني)', '/cnss_br_(maladie|family|eos)\b/', [$F, $C, 'pages/employees.php', 'pages/teacher_form.php', 'includes/annual_slip_data.php'], 'cnssBranchOn()'],
     ];
