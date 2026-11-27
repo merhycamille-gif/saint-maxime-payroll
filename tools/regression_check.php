@@ -4773,7 +4773,7 @@ check('تجربة حيّة (موظفة بلا إعداد): إضافة سطر إ�
  * =================================================================== */
 require_once $PROJ . '/includes/data_audit.php';
 $aud90 = dataAuditRules($db, '2025-2026');
-$info90 = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'orphan_rows', 'row_rate0', 'pay_period_rows'];
+$info90 = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'orphan_rows', 'row_rate0', 'pay_period_rows', 'subj_after_cnss', 'subj_after_finance', 'subj_after_eoc'];   // 27/11/2026: «محسوم مخزَّن بعد ترك الجهة» للمراجعة (كـleft_rows: قد يكون شهراً مدفوعاً بقرار، مثل حنان تحومي)
 $bad90 = []; foreach ($aud90 as $a) if ($a['n'] > 0 && !in_array($a['key'], $info90, true)) $bad90[] = $a['key'] . '=' . $a['n'];
 check('الفحص الرسمي (21 قاعدة، منها tax_stale الضريبة ≠ القانون الحيّ منذ 2026-09-10) على النسخة المحلية 2025-2026: صفر أخطاء حساب (المعلوماتية للمراجعة مستثناة)', !$bad90, implode(' ', $bad90));
 check('شفاء تكميل العلاوات لا يستدعي المحرّك الكامل مباشرةً (سبب تصفير الأساس أونلاين) + شفاء الاسترجاع موصول + اللقطة + بطاقة الفحص',

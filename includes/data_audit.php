@@ -140,6 +140,14 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026', array $schoolIds = []
           AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > DATE_ADD(" . leftDateSql('e.') . ", INTERVAL 1 MONTH)
         GROUP BY e.id"));
 
+    // 15ب) ⚖️ 27/11/2026 (تدقيق «ما بدّي بقى أخطاء»): محسوم مخزَّن بشهر لم يعد الموظف خاضعاً فيه لتلك الجهة (ترك الضمان/المالية/الصندوق، أو ملاك بلغ 64)
+    //      — المصدر الواحد monthSubjectTo()؛ الشهر المخزَّن قديم ويلزمه إعادة حساب أو تصحيح تاريخ الترك بملفّه.
+    foreach (['cnss' => ['الضمان', 'ms.cnss_amount_lbp > 0 OR ms.school_cnss_8_lbp > 0'], 'finance' => ['ضريبة الدخل', 'ms.income_tax_lbp > 0'], 'eoc' => ['صندوق التعويضات', 'ms.caisse_amount_lbp > 0 OR ms.school_eoc_6_lbp > 0']] as $kd => [$lbK, $cdK]) {
+        $hit = []; try { $stK = $db->prepare("SELECT e.*, ms.year y_, ms.month m_ FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE e.is_deleted = 0 AND ms.school_year = ? AND ($cdK)" . ($schoolIds ? ' AND e.school_id IN (' . implode(',', array_map('intval', $schoolIds)) . ')' : '')); $stK->execute([$sy]);
+            foreach ($stK->fetchAll() as $rK) if (!monthSubjectTo($rK, $kd, (int)$rK['y_'], (int)$rK['m_'])) $hit[(int)$rK['id']] = ['nm' => trim(($rK['first_name_ar'] ?? '') . ' ' . ($rK['last_name_ar'] ?? '')) . ' (' . (int)$rK['m_'] . '/' . (int)$rK['y_'] . '…)']; } catch (Throwable $eK) {}
+        $add('subj_after_' . $kd, 'محسوم ' . $lbK . ' مخزَّن بشهر لم يعد الموظف خاضعاً فيه (بعد تاريخ تركه لهذه الجهة أو بعد الـ64) — شهر قديم يلزمه إعادة حساب أو تصحيح التاريخ بملفّه', array_values($hit));
+    }
+
     // 16) أسماء مكرّرة فاعلة بنفس المدرسة (اسم + شهرة + أب)
     $add('dupes', 'موظفان فاعلان بنفس الاسم والشهرة والأب بنفس المدرسة', $q("
         SELECT CONCAT(e1.first_name_ar,' ',e1.father_name_ar,' ',e1.last_name_ar) nm FROM employees e1 JOIN employees e2 ON e2.id>e1.id AND e2.school_id=e1.school_id
