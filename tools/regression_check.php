@@ -8328,6 +8328,29 @@ $srcEocP = (string)file_get_contents(__DIR__ . '/../includes/eoc_portal.php'); $
 check('⚖️ صندوق التعويضات — البيان المالي: المحسوم الفصلي = الشهري × أشهر الخضوع فقط (ملاك بلغ 64 بآذار ⇒ شهران من فصل ك2–آذار، وصفر بالفصل التالي)',
     strpos($srcEocP, "'teacher_q_disc' => \$monthly * \$nMois") !== false && strpos($srcEocP, 'eocFinRecalc($row, $nMois)') !== false
     && count(array_filter($piT['months'], fn($ym) => monthSubjectTo($eT, 'eoc', (int)$ym[0], (int)$ym[1]))) === 2 && count(array_filter(eocPeriodInfo('202603')['months'], fn($ym) => monthSubjectTo($eT, 'eoc', (int)$ym[0], (int)$ym[1]))) === 0);
+// 🛡️ 27/11/2026 (المدير: «ما بدّي بقى أخطاء») حارس آلي لقاعدة الـ64 عند صندوق التعويضات: لكل أستاذ ملاك بلغ 64 وله راتب بالسنة الجارية
+//    تُفتَح فعلياً كل أوراق الصندوق (البوّابة + النماذج الرسمية) ويُتأكَّد: غير موجود بأيّ ورقة ملاك ولا بالبيان الفصلي، وموجود بأوراق المتعاقدين.
+//    أيّ ورقة جديدة تعرض «ملاك/متعاقد» ولا تأخذ من empFundKind() ⇒ تُضاف هنا وإلّا فالقفل يلقطها.
+$g64sy = currentSchoolYear(); $g64bad = []; $g64n = 0;
+$g64st = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.birth_date > '1900-01-01' AND e.birth_date <= DATE_SUB(CURDATE(), INTERVAL 64 YEAR)
+    AND (e.left_date_all IS NULL OR e.left_date_all > CURDATE()) AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.base_plus_echelon_lbp > 0) ORDER BY e.id LIMIT 6");
+$g64st->execute([$g64sy]);
+$g64q = (int)ceil((int)date('n') / 3);
+foreach ($g64st->fetchAll() as $g64e) { $g64n++;
+    $pre = trim((string)$g64e['first_name_ar']); $nom = trim((string)$g64e['last_name_ar']); $pere = trim((string)($g64e['father_name_ar'] ?? '')); $sidE = [(int)$g64e['school_id']];
+    $rx = '/' . preg_quote($pre, '/') . '\s+(?:' . preg_quote($pere, '/') . '\s+)?' . preg_quote($nom, '/') . '/u';
+    $dans = function (string $rel, array $get) use ($rx, $sidE, $g64sy): bool { $h = renderPage($rel, $get, ['base', 'extra', 'bonus'], $sidE, '', $g64sy); $h = preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags(preg_replace('#<(script|style|select)\b.*?</\1>#siu', ' ', $h)), ENT_QUOTES, 'UTF-8')); return preg_match($rx, $h) === 1; };
+    $attendu = [   // [ورقة، معاملات، يجب أن يكون موجوداً؟]
+        ['pages/official_forms.php', ['form' => 'eoc_staff', 'cat' => 'titulaire'], false], ['pages/official_forms.php', ['form' => 'eoc_staff', 'cat' => 'contractuel'], true],
+        ['pages/official_forms.php', ['form' => 'teaching_staff', 'cat' => 'titulaire'], false], ['pages/official_forms.php', ['form' => 'teaching_staff', 'cat' => 'contractuel'], true],
+        ['pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => $g64q], false],
+        ['pages/eoc_portal.php', ['tab' => 'general', 'period' => $g64sy, 'emp' => 'staff'], false], ['pages/eoc_portal.php', ['tab' => 'general', 'period' => $g64sy, 'emp' => 'contract'], true],
+        ['pages/eoc_portal.php', ['tab' => 'financial', 'period' => eocCodeOfMonth((int)date('Y'), (int)date('n'))], false],
+    ];
+    foreach ($attendu as [$rel, $get, $doit]) if ($dans($rel, $get) !== $doit) $g64bad[] = "#{$g64e['id']} $pre $nom: " . basename($rel) . '?' . http_build_query($get) . ' ⇒ ' . ($doit ? 'غير موجود (يجب أن يكون)' : 'موجود (يجب ألّا يكون)');
+}
+check('🛡️ حارس الـ64 عند صندوق التعويضات: كل ملاك بلغ 64 (' . $g64n . ' بالسنة ' . $g64sy . ') غير موجود بأوراق الملاك والبيان الفصلي، وموجود بأوراق المتعاقدين — البوّابة والنماذج الرسمية (8 أوراق تُفتَح فعلياً لكل واحد)',
+    !$g64bad, implode(' | ', array_slice($g64bad, 0, 6)));
 check('🔒 قفل المصدر الواحد (2026-11-26 «بس تصلّح شغلة بالأساس، لحالها تتصلّح بكل البرنامج وبكل التقارير»): كل قاعدة بالسجلّ مكتوبة بمصدرها فقط', !$ru173, $ru173 ? count($ru173) . ' خارج المصدر — أوّلها ' . $ru173[0][1] . ':' . $ru173[0][2] . ' [' . $ru173[0][0] . ']' : count(reglesUniquesRegistre()) . ' قاعدة');
 // لا «قرار مطلوب»: بطاقة الـ64 بلا زرّ «يبقى»، ولا مهمّة «قرار» بلائحة الشغل
 $c173('no-decision-ui', strpos((string)file_get_contents($PROJ . '/includes/age64.php'), '$need = [];') !== false && strpos((string)file_get_contents($PROJ . '/includes/todo.php'), "'بلغوا سنّ الـ64 — قرار'") === false);
