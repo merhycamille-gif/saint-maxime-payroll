@@ -8352,6 +8352,22 @@ foreach ($g64st->fetchAll() as $g64e) { $g64n++;
 }
 check('🛡️ حارس الـ64 عند صندوق التعويضات: كل ملاك بلغ 64 (' . $g64n . ' بالسنة ' . $g64sy . ') غير موجود بأوراق الملاك والبيان الفصلي، وموجود بأوراق المتعاقدين — البوّابة والنماذج الرسمية (8 أوراق تُفتَح فعلياً لكل واحد)',
     !$g64bad, implode(' | ', array_slice($g64bad, 0, 6)));
+// 🛡️ 27/11/2026 حارس آلي: البيان المالي لصندوق التعويضات (كل المدارس × آخر 5 فصول) = المخزَّن بالرواتب لكل أستاذ.
+//    يلقط أيّ أستاذ يُصرَّح عنه للصندوق ولم يُحسَم عنه (دخل الملاك لاحقاً، بلغ 64، ترك الصندوق…) أو حُسم عنه ولا يظهر بالبيان.
+$gF = ['n' => 0, 'dif' => [], 'abs' => []]; $gFm = (int)date('n'); $gFy = (int)date('Y'); $gFcodes = [];
+for ($k = 0; $k < 5; $k++) { $gFcodes[] = eocCodeOfMonth($gFy, $gFm); $gFm -= 3; if ($gFm < 1) { $gFm += 12; $gFy--; } }
+foreach ($db->query("SELECT id FROM schools ORDER BY id")->fetchAll(PDO::FETCH_COLUMN) as $gFs) foreach (array_unique($gFcodes) as $gFc) {
+    $gFp = eocPeriodInfo($gFc); $gFw = []; foreach ($gFp['months'] as [$y_, $m_]) $gFw[] = "(ms.year=$y_ AND ms.month=$m_)";
+    $gFst = []; foreach ($db->query("SELECT ms.employee_id id, SUM(ms.caisse_amount_lbp) c, SUM(ms.school_eoc_6_lbp) s, COUNT(*) n FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE e.school_id = " . (int)$gFs . " AND e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND ms.base_plus_echelon_lbp > 0 AND (" . implode(' OR ', $gFw) . ") GROUP BY ms.employee_id")->fetchAll() as $r_) $gFst[(int)$r_['id']] = $r_;
+    $gFvu = [];
+    foreach (eocFinancialRows($db, [(int)$gFs], $gFc, eocLoad($db, [(int)$gFs], 'financial', $gFc)) as $r_) { if (empty($r_['emp_id']) || !empty($r_['ov'])) { if (!empty($r_['emp_id'])) $gFvu[(int)$r_['emp_id']] = 1; continue; } $id_ = (int)$r_['emp_id']; $gFvu[$id_] = 1; $gF['n']++;
+        $s_ = $gFst[$id_] ?? null; if (!$s_ || (int)$s_['n'] !== 3) continue;
+        $pc_ = (float)str_replace(',', '', (string)$r_['teacher_q_disc']); $ps_ = (float)str_replace(',', '', (string)$r_['school_q_disc']);
+        if (abs($pc_ - (float)$s_['c']) > 1 || abs($ps_ - (float)$s_['s']) > 1) $gF['dif'][] = "مدرسة $gFs $gFc #$id_ {$r_['teacher_name']}: البيان " . number_format($pc_) . '/' . number_format($ps_) . ' ≠ الرواتب ' . number_format((float)$s_['c']) . '/' . number_format((float)$s_['s']); }
+    foreach ($gFst as $id_ => $s_) if (!isset($gFvu[$id_]) && ((float)$s_['c'] > 0 || (float)$s_['s'] > 0)) $gF['abs'][] = "مدرسة $gFs $gFc #$id_ محسوم عنه " . number_format((float)$s_['c']) . ' وغير موجود بالبيان';
+}
+check('🛡️ حارس صندوق التعويضات: البيان المالي (' . $gF['n'] . ' سطراً — كل المدارس × آخر 5 فصول) = المحسوم المخزَّن بالرواتب لكل أستاذ، ولا أحد محسوم عنه وغائب عن البيان',
+    !$gF['dif'] && !$gF['abs'], implode(' | ', array_slice(array_merge($gF['dif'], $gF['abs']), 0, 6)));
 check('🔒 قفل المصدر الواحد (2026-11-26 «بس تصلّح شغلة بالأساس، لحالها تتصلّح بكل البرنامج وبكل التقارير»): كل قاعدة بالسجلّ مكتوبة بمصدرها فقط', !$ru173, $ru173 ? count($ru173) . ' خارج المصدر — أوّلها ' . $ru173[0][1] . ':' . $ru173[0][2] . ' [' . $ru173[0][0] . ']' : count(reglesUniquesRegistre()) . ' قاعدة');
 // لا «قرار مطلوب»: بطاقة الـ64 بلا زرّ «يبقى»، ولا مهمّة «قرار» بلائحة الشغل
 $c173('no-decision-ui', strpos((string)file_get_contents($PROJ . '/includes/age64.php'), '$need = [];') !== false && strpos((string)file_get_contents($PROJ . '/includes/todo.php'), "'بلغوا سنّ الـ64 — قرار'") === false);

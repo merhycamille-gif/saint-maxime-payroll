@@ -338,6 +338,7 @@ function eocFinancialRows(PDO $db, array $ids, string $code, array $data): array
     foreach ($emps as $e) {
         $id = (int)$e['id']; if (in_array($id, array_map('intval', $data['deleted']), true)) continue;
         if (!monthSubjectTo($e, 'eoc', (int)$y, (int)$m)) continue;   // ⚖️ 26/11/2026: المصدر الواحد — ترك الصندوق أو بلغ 64 ⇒ لا يُصرَّح عنه للصندوق
+        if (empFundPaidInMonths($id, $pi['months']) === false) continue;   // ⚖️ 27/11/2026: رواتب الفصل كلّها محسوبة ولم يُحسَم عنه للصندوق بأيّ شهر منها (كان متعاقداً وقتها ودخل الملاك لاحقاً) ⇒ لا يُصرَّح عنه لذلك الفصل
         $s = $cur[$id]; $p = $prev[$id] ?? null;
         $base = round($s['base']); $extra = round($s['extra']);
         // 🏛️ (2026-11-12 قراره) «الراتب السابق» = الراتب قبل التدرّج كما بالبطاقة السنوية لسنة البيان، و«الحالي» = بعد التدرّج.

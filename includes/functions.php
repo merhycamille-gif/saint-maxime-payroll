@@ -1241,7 +1241,24 @@ function empFundKind(array $emp, string $schoolYear, ?string $asOf = null): stri
     [$y1] = schoolYearToYears($schoolYear); $y1 = (int)$y1;
     $deb = sprintf('%04d-10', $y1); $fin = sprintf('%04d-09', $y1 + 1); $auj = substr($asOf ?? date('Y-m-d'), 0, 7);
     $ref = $auj < $deb ? $deb : ($auj > $fin ? $fin : $auj);
-    return titulaireExemptEoc64($emp, (int)substr($ref, 5, 2), (int)substr($ref, 0, 4)) ? 'contract' : 'staff';
+    if (titulaireExemptEoc64($emp, (int)substr($ref, 5, 2), (int)substr($ref, 0, 4))) return 'contract';
+    // ⚖️ 27/11/2026 (تدقيق: 11 أستاذاً دخلوا الملاك 1/10/2026 كانوا يظهرون «ملاك» ببيانات السنة السابقة): الحقيقة = الرواتب المخزَّنة —
+    //    له رواتب بتلك السنة ولم يُحسَم عنه للصندوق بأيّ شهر منها (لا منه ولا من المدرسة) ⇒ لم يكن من ملاك الصندوق تلك السنة ⇒ متعاقد.
+    //    (تاريخ دخول الملاك المسجَّل تقريبي عند 206 أساتذة فلا يُعتمَد.)
+    return (!empty($emp['id']) && empFundPaidInYear((int)$emp['id'], $schoolYear) === false) ? 'contract' : 'staff';
+}
+/** هل حُسم عنه لصندوق التعويضات (منه أو من المدرسة أو درجة/نصف) بأيّ شهر من السنة؟ true/false، أو null إن لا رواتب له بتلك السنة (لا حكم). كاش لكل سنة. */
+function empFundPaidInYear(int $empId, string $schoolYear): ?bool {
+    static $c = [];
+    if (!isset($c[$schoolYear])) { $c[$schoolYear] = []; try { $st = getDB()->prepare("SELECT employee_id, SUM(caisse_amount_lbp + school_eoc_6_lbp + eoc_grade_lbp) s FROM monthly_salaries WHERE school_year = ? AND base_plus_echelon_lbp > 0 GROUP BY employee_id"); $st->execute([$schoolYear]); foreach ($st->fetchAll() as $r) $c[$schoolYear][(int)$r['employee_id']] = (float)$r['s'] > 0; } catch (Throwable $e) {} }
+    return $c[$schoolYear][$empId] ?? null;
+}
+/** هل حُسم عنه للصندوق بأيّ شهر من أشهر معيّنة ([[سنة،شهر]،…])؟ true/false، أو null إن لم تُحسَب رواتب كل تلك الأشهر بعد. */
+function empFundPaidInMonths(int $empId, array $months): ?bool {
+    if (!$months) return null; $w = []; foreach ($months as $ym) $w[] = '(year = ' . (int)$ym[0] . ' AND month = ' . (int)$ym[1] . ')';
+    try { $r = getDB()->query("SELECT COUNT(*) n, COALESCE(SUM(caisse_amount_lbp + school_eoc_6_lbp + eoc_grade_lbp), 0) s FROM monthly_salaries WHERE employee_id = $empId AND base_plus_echelon_lbp > 0 AND (" . implode(' OR ', $w) . ")")->fetch(); } catch (Throwable $e) { return null; }
+    if ((int)$r['n'] < count($months)) return null;
+    return (float)$r['s'] > 0;
 }
 
 function monthSubjectTo(array $emp, string $kind, int $year, int $month): bool {
