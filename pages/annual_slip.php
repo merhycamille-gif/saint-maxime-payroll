@@ -14,6 +14,7 @@ $action = $_GET['action'] ?? '';
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 $schoolYear = $_GET['school_year'] ?? activeSchoolYear();
 if ($schoolYear === 'all') $schoolYear = currentSchoolYear(); // الكشف يحتاج سنة محددة
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') msaTypeYear($schoolYear);   // 🔁 الفئة بصفة السنة المعروضة
 // 📝 (2026-09-26 «بدي أقدر أطبع بطاقة سنوية فيها المبالغ فاضية حتى إذا بدي عبّي أنا أي أستاذ باليد»):
 //    blank=1 = بطاقة هذا الأستاذ بلا أي مبلغ أو رقم راتب (الأشهر والهوية تبقى) · blank=2 = نموذج فارغ لأي أستاذ (الهوية فارغة أيضاً، المدرسة والسنة تبقيان)
 //    التصميم نفسه حرفياً (البطاقة مجمّدة) — التفريغ يُطبَّق على الـHTML الجاهز بعد الحساب، فلا يمسّ الحساب ولا العرض العادي.
@@ -73,8 +74,8 @@ function getYearEmployees($db, $schoolYear, $typeFilter = '') {
     $sql = "SELECT DISTINCT e.* FROM employees e WHERE e.is_deleted = 0" . schoolScopeSql('e.school_id') . $yf;
     $params = $yp;
     if (is_array($typeFilter)) $sql .= empTypeSqlFrom($db, $typeFilter, 'e.'); // ☑️ حالة خانات التشييك
-    elseif ($typeFilter) { $sql .= " AND e.employee_type = ?"; $params[] = $typeFilter; }
-    $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
+    elseif ($typeFilter) { $sql .= " AND " . empTypeAtSql('e.') . " = ?"; $params[] = $typeFilter; }
+    $sql .= " ORDER BY FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();
@@ -93,7 +94,7 @@ function getYearCalcRoster($db, $typeFilter = '') {
          . schoolScopeSql('e.school_id');
     $params = [];
     if (is_array($typeFilter)) $sql .= empTypeSqlFrom($db, $typeFilter, 'e.'); // ☑️ حالة خانات التشييك
-    elseif ($typeFilter) { $sql .= " AND e.employee_type = ?"; $params[] = $typeFilter; }
+    elseif ($typeFilter) { $sql .= " AND " . empTypeAtSql('e.') . " = ?"; $params[] = $typeFilter; }
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();

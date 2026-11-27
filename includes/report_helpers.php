@@ -1147,8 +1147,8 @@ function duesBySchool(PDO $db, array $months, int $year): array {
         $st->execute(array_merge([$year], $yp));
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $sid = (int)$r['sid']; $out[$sid] = ($out[$sid] ?? []) + ['cnss' => 0, 'eoc' => 0, 'tax' => 0]; $out[$sid][$k] = (int)round((float)$r['v']); }
     };
-    $run('cnss', "ms.cnss_amount_lbp + ms.school_cnss_8_lbp + IF(e.employee_type = 'employe', ms.school_family_comp_6_lbp + ms.school_end_of_service_8_5_lbp - ms.family_allowance_lbp, 0)", " AND e.cnss_subject = 1");
-    $run('eoc', "ms.caisse_amount_lbp + ms.eoc_grade_lbp + ms.school_eoc_6_lbp", " AND e.employee_type = 'enseignant_titulaire'");
+    $run('cnss', "ms.cnss_amount_lbp + ms.school_cnss_8_lbp + IF(" . empTypeAtSql('e.', 'ms.school_year') . " = 'employe', ms.school_family_comp_6_lbp + ms.school_end_of_service_8_5_lbp - ms.family_allowance_lbp, 0)", " AND e.cnss_subject = 1");
+    $run('eoc', "ms.caisse_amount_lbp + ms.eoc_grade_lbp + ms.school_eoc_6_lbp", " AND " . empTypeAtSql('e.', 'ms.school_year') . " = 'enseignant_titulaire'");
     $run('tax', "ms.income_tax_lbp", " AND e.tax_subject = 1");
     return $out;
 }

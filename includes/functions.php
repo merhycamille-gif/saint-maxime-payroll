@@ -1236,8 +1236,43 @@ function leftDateOfFor(array $emp, string $kind): ?string {
  * ⇒ ملاك بلغ 64 = متعاقد عند الصندوق من شهر بلوغه: للسنة الجارية يُنظر لشهر اليوم، لسنة ماضية لآخر شهرها (أيلول)، لسنة قادمة لأوّلها (تشرين الأوّل).
  * ملفّه وراتبه بالبرنامج لا يتغيّران لحالهما («المتعاقد نحنا منحدّدو»). $asOf (Y-m-d) للفحص فقط.
  */
+/** 🔁 صفة الموظف بسنة دراسية معيّنة (المصدر الواحد): مَن كان ملاكاً وصار متعاقداً من سنة (contract_from_sy) يبقى «ملاك» بسنواته قبلها. */
+function empTypeInYear(array $emp, string $schoolYear): string {
+    $t = (string)($emp['employee_type'] ?? ''); $c = (string)($emp['contract_from_sy'] ?? '');
+    return ($t !== 'enseignant_titulaire' && $c !== '' && preg_match('/^\d{4}-\d{4}$/', $schoolYear) && strcmp($schoolYear, $c) < 0) ? 'enseignant_titulaire' : $t;
+}
+/** 🔁 صفحة تعرض سنة معيّنة تعلن سنتها هنا مرّة واحدة: كل استعلاماتها (فلتر/ترتيب/عنوان الفئة) وكل صفوف الموظفين المجلوبة تصير بصفة تلك السنة. */
+function msaTypeYear(?string $sy): void {
+    if (!is_string($sy) || !preg_match('/^\d{4}-\d{4}$/', $sy)) return;
+    $db = getDB(); if (!msaHasCol($db, 'employees', 'contract_from_sy')) return;
+    $GLOBALS['MSA_TYPE_SY'] = $sy;
+    try { $db->setAttribute(PDO::ATTR_STATEMENT_CLASS, ['MsaTypeStatement']); } catch (Throwable $t) {}
+}
+/** صفّ موظف مجلوب (فيه employee_type + contract_from_sy) ⇒ صفته بسنة الصفحة المعلَنة */
+function msaTypeRowFix($r) {
+    if (is_array($r) && isset($GLOBALS['MSA_TYPE_SY'], $r['employee_type'], $r['contract_from_sy'])) $r['employee_type'] = empTypeInYear($r, $GLOBALS['MSA_TYPE_SY']);
+    return $r;
+}
+/** تعبير SQL لصفة الموظف: بسنة الصفحة المعلَنة (msaTypeYear)، أو بسنة الصفّ ($syExpr مثل 'ms.school_year')، وإلا العمود كما هو. */
+function empTypeAtSql(string $alias = 'e.', ?string $syExpr = null): string {
+    $col = $alias . 'employee_type';
+    if ($syExpr === null) { if (empty($GLOBALS['MSA_TYPE_SY'])) return $col; $syExpr = getDB()->quote($GLOBALS['MSA_TYPE_SY']); }
+    elseif (!msaHasCol(getDB(), 'employees', 'contract_from_sy')) return $col;
+    return "IF($col <> 'enseignant_titulaire' AND COALESCE({$alias}contract_from_sy,'') > $syExpr, 'enseignant_titulaire', $col)";
+}
+class MsaTypeStatement extends PDOStatement {
+    protected function __construct() {}
+    #[\ReturnTypeWillChange] public function fetch($mode = null, $cursorOrientation = PDO::FETCH_ORI_NEXT, $cursorOffset = 0) { return msaTypeRowFix($mode === null ? parent::fetch() : parent::fetch($mode, $cursorOrientation, $cursorOffset)); }
+    #[\ReturnTypeWillChange] public function fetchAll($mode = null, ...$args) { $a = $mode === null ? parent::fetchAll() : parent::fetchAll($mode, ...$args); if (!empty($GLOBALS['MSA_TYPE_SY'])) foreach ($a as $k => $r) if (is_array($r) && isset($r['employee_type'], $r['contract_from_sy'])) $a[$k] = msaTypeRowFix($r); return $a; }
+    public function getIterator(): Iterator { while (($r = $this->fetch()) !== false) yield $r; }
+}
+/** هل هذه السنة قبل تحوّله من ملاك إلى متعاقد؟ (رواتبها مدفوعة كملاك ⇒ لا يُعاد حسابها بمحرّك المتعاقد) */
+function empYearBeforeContract(array $emp, string $schoolYear): bool {
+    return ($emp['employee_type'] ?? '') !== 'enseignant_titulaire' && empTypeInYear($emp, $schoolYear) === 'enseignant_titulaire';
+}
 function empFundKind(array $emp, string $schoolYear, ?string $asOf = null): string {
-    if (($emp['employee_type'] ?? '') !== 'enseignant_titulaire') return 'contract';
+    if (empTypeInYear($emp, $schoolYear) !== 'enseignant_titulaire') return 'contract';
+    $emp['employee_type'] = 'enseignant_titulaire';   // سنة كان فيها ملاكاً
     [$y1] = schoolYearToYears($schoolYear); $y1 = (int)$y1;
     $deb = sprintf('%04d-10', $y1); $fin = sprintf('%04d-09', $y1 + 1); $auj = substr($asOf ?? date('Y-m-d'), 0, 7);
     $ref = $auj < $deb ? $deb : ($auj > $fin ? $fin : $auj);
@@ -2050,6 +2085,7 @@ function monthStaleCompare(array $e, string $sy, ?PDO $db = null): ?array {
     if (isSchoolYearLocked((int)($e['school_id'] ?? 0), $sy)) return null;
     $cfs = (string)($e['cadre_from_sy'] ?? '');
     if (preg_match('/^(\d{4})-\d{4}$/', $cfs, $cm) && (int)$m[1] < (int)$cm[1]) return null; // سنة كان فيها متعاقداً
+    if (empYearBeforeContract($e, $sy)) return null; // 🔁 سنة كان فيها ملاكاً قبل أن يصير متعاقداً
     $ld = function_exists('leftDateOf') ? leftDateOf($e) : null;
     if ($ld !== null) { $depRank = ((int)substr($ld, 5, 2) >= 10) ? (int)substr($ld, 0, 4) : (int)substr($ld, 0, 4) - 1; if ((int)$m[1] > $depRank) return null; }
     $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0) ORDER BY year, month");
@@ -7646,7 +7682,7 @@ function empTypeSelection(?array $src = null, string $param = 'emp_type'): array
 function empTypeSqlFrom(PDO $db, array $st, string $alias = 'e.'): string {
     if ($st['none']) return ' AND 1=0';
     if ($st['all']) return '';
-    return ' AND ' . $alias . 'employee_type IN (' . implode(',', array_map(fn($t) => $db->quote($t), $st['sel'])) . ')';
+    return ' AND ' . empTypeAtSql($alias) . ' IN (' . implode(',', array_map(fn($t) => $db->quote($t), $st['sel'])) . ')';   // 🔁 بصفة سنة الصفحة إن أعلنتها
 }
 /** نصّ الفئات المشيّكة للعنوان المطبوع (فارغ = الكل) */
 function empTypeTitleFrom(array $st): string {

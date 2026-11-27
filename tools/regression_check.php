@@ -2349,9 +2349,9 @@ $q34 = function ($extraWhere) use ($db, $yf34, $yp34, $act34) {
 $h34 = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026, 'emp_type' => 'enseignant_contractuel'], []);
 preg_match('/مجموع كل الفئات \(العدد: (\d+)\)/u', $h34, $m34a);
 check('فلتر الفئة (تجربة فعلية): كشف حزيران بالمتعاقدين فقط — العدد الظاهر = عدّ القاعدة، وعنوانه يذكر الفئة',
-      isset($m34a[1]) && (int)$m34a[1] === $q34(" AND e.employee_type = 'enseignant_contractuel'")
+      isset($m34a[1]) && (int)$m34a[1] === $q34(" AND IF(e.employee_type <> 'enseignant_titulaire' AND COALESCE(e.contract_from_sy,'') > '2025-2026', 'enseignant_titulaire', e.employee_type) = 'enseignant_contractuel'")
       && strpos($h34, '— المتعاقدين') !== false,
-      'ظاهر: ' . ($m34a[1] ?? '؟') . ' / قاعدة: ' . $q34(" AND e.employee_type = 'enseignant_contractuel'"));
+      'ظاهر: ' . ($m34a[1] ?? '؟') . ' / قاعدة: ' . $q34(" AND IF(e.employee_type <> 'enseignant_titulaire' AND COALESCE(e.contract_from_sy,'') > '2025-2026', 'enseignant_titulaire', e.employee_type) = 'enseignant_contractuel'"));
 // فلتر «خاضع للضريبة»: العدد الظاهر = عدّ القاعدة (وإن كان صفراً تُعرض «لا توجد بيانات» بسلام)
 $h34b = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026, 'tax_sub' => '1'], []);
 preg_match('/مجموع كل الفئات \(العدد: (\d+)\)/u', $h34b, $m34b);
@@ -4304,7 +4304,7 @@ check('عبرا: فيوليت الحمصي وتريز حبقوق «اساتذة 
 healAbraCw20260827();
 $cw75 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
-    WHERE e.school_id=$abra75 AND e.is_deleted=0 AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();
+    WHERE e.school_id=$abra75 AND e.is_deleted=0 AND COALESCE(e.contract_from_sy,'') <= '2025-2026' AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();
 // 🔒 (2026-11-02 قراره ب: الأشهر المدفوعة 2025-2026 ثابتة) المرجع المجمَّد بعد إرجاع عيف عيد 1815 من نسخة 20/8 (كان صافيه 970,000 بخطأ 21/9):
 //    52 شخصاً، صافي 2,029,397,000. ملاحظة موثَّقة: كشفه القديم (27/8) كان 2,063,537,000 — الفارق 34,140,000 لم يُفكّ (لا نسخة صفّية للكشف القديم)؛ أي تغيّر لاحق = فشل
 // ➕ (2026-11-14 قراره «مرسال سلوم حطّها تاكسابل كمان 2025-2026»): مرسال مطانيوس سلوم #1576 (موظفة، كانت غير تاكسابل ببرنامجه ومحذوفة 10/10)
@@ -4347,7 +4347,7 @@ healBecharaCw20260827();
 $bech76 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
 $bcw76 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
-    WHERE e.school_id=$bech76 AND e.is_deleted=0 AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();   // 📅 الفئة بشهر الكشف (2026-11-02)
+    WHERE e.school_id=$bech76 AND e.is_deleted=0 AND COALESCE(e.contract_from_sy,'') <= '2025-2026' AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();   // 📅 الفئة بشهر الكشف (2026-11-02)
 check('البشارة: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم (11 شخصاً، صافي 358,842,750 + نقل 82,800,000 = مجموع 441,642,750 — الصافي بالليرة كما هو 2026-11-15) بعد حذف غير الخاضعين الأربعة بقراره',
       (int)$bcw76['n'] === 11 && (float)$bcw76['net'] === 358842750.0
       && (float)$bcw76['tr'] === 82800000.0 && (float)$bcw76['due'] === 441642750.0
@@ -4363,7 +4363,7 @@ healEntikalCw20260827();
 $ent77 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة الانتقال%' AND is_deleted=0 LIMIT 1")->fetchColumn();
 $ecw77 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
-    WHERE e.school_id=$ent77 AND e.is_deleted=0 AND e.id <> 283 AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();   // 📅 الفئة بشهر الكشف؛ جومانا بصيبص 283 كانت ملاكاً بتشرين 2025 («صارت متعاقدة» 2026-2027 بقراره 11-02)
+    WHERE e.school_id=$ent77 AND e.is_deleted=0 AND e.id <> 283 AND COALESCE(e.contract_from_sy,'') <= '2025-2026' AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();   // 📅 الفئة بشهر الكشف؛ جومانا بصيبص 283 كانت ملاكاً بتشرين 2025 («صارت متعاقدة» 2026-2027 بقراره 11-02)
 // ⚖️ (2026-11-09 «صحّح كل شي على القانون يا أستاذ») ضريبة سمير اعزان 155,000→230,000 وطانيوس سابا 325,500→438,000 بتشرين 2025 ⇒ الصافي 649,445,000→649,262,910 والمجموع 762,845,000→762,662,910
 check('الانتقال: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم بعد تصحيح ضريبة القانون 11-09 (17 شخصاً، صافي 649,262,910 + نقل 113,400,000 = مجموع 762,662,910 — الصافي بالليرة كما هو 2026-11-15)',
       (int)$ecw77['n'] === 17 && (float)$ecw77['net'] === 649262910.0
@@ -4395,7 +4395,7 @@ healNiyahCw20260827();
 $niy78 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة النياح%' AND is_deleted=0 LIMIT 1")->fetchColumn();
 $ncw78 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
-    WHERE e.school_id=$niy78 AND e.is_deleted=0 AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();   // 📅 الفئة بشهر الكشف (2026-11-02)
+    WHERE e.school_id=$niy78 AND e.is_deleted=0 AND COALESCE(e.contract_from_sy,'') <= '2025-2026' AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();   // 📅 الفئة بشهر الكشف (2026-11-02)
 $nm78 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.cnss_amount_lbp),0) cn, COALESCE(SUM(ms.transport_lbp),0) tr
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
     WHERE e.school_id=$niy78 AND e.employee_type = 'enseignant_titulaire' AND ms.year=2025 AND ms.month=10")->fetch();
@@ -7102,7 +7102,7 @@ if ($e147) {
 }
 check('🏦 نماذج نهاية الخدمة p1/p2/p3: تُرندَر بلا خطأ لموظف حقيقي + مجموع الأجور = مجموع السنوات والاشتراك = المجموع × النسبة + حفظ/حذف الخانات المعدَّلة + قصر النموذج على الموظف والمتعاقد + بلاطات التقارير',
       $ok147 && strpos($of147, "\$laborLawOnly = ['cnss_eos_doc','cnss_eos_2y','cnss_eos_annual'];") !== false
-      && strpos($of147, "in_array(\$form, \$laborLawOnly) ? \" AND employee_type IN ('employe','enseignant_contractuel')\"") !== false
+      && strpos($of147, "in_array(\$form, \$laborLawOnly) ? \" AND \" . empTypeAtSql('') . \" IN ('employe','enseignant_contractuel')\"") !== false
       && strpos($of147, 'eosHandlePost($db);') !== false && strpos($of147, "elseif (in_array(\$form, ['cnss_eos_doc','cnss_eos_2y','cnss_eos_annual'], true)):") !== false
       && substr_count($rp147, "\$OF.'cnss_eos_doc'") === 1 && substr_count($rp147, "\$OF.'cnss_eos_2y'") === 1 && substr_count($rp147, "\$OF.'cnss_eos_annual'") === 1
       && (bool)$db->query("SHOW TABLES LIKE 'official_form_edits'")->fetch(),
@@ -7346,12 +7346,12 @@ $sel152 = preg_match('/<select name="pay_from_month"[^>]*>\s*<option value="10" 
 $sy152s = currentSchoolYear(); $y152 = (int)substr($sy152s, 0, 4);
 $pmBad152 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND status = 'actif' AND left_date_all IS NULL
     AND NOT (COALESCE(payment_months_per_year,10) = 12 OR (hire_date >= '{$y152}-10-01' AND payment_months_per_year = 9 AND pay_from_month = 10 AND pay_to_month = 6))")->fetchColumn();
-$m13Bad152 = (int)$db->query("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.left_date_all IS NULL AND e.employee_type = 'enseignant_contractuel' AND e.hire_date <= '" . ($y152 - 2) . "-10-01' AND COALESCE(e.has_13th_month,0) = 0
+$m13Bad152 = (int)$db->query("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.left_date_all IS NULL AND e.employee_type = 'enseignant_contractuel' AND e.hire_date <= '" . ($y152 - 2) . "-10-01' AND COALESCE(e.has_13th_month,0) = 0 AND COALESCE(e.contract_from_sy,'') < '$sy152s'
     AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = '$sy152s' AND (ms.net_salary_lbp > 0 OR ms.base_plus_echelon_lbp > 0 OR ms.prime_fixe_lbp > 0))")->fetchColumn(); // متعاقد > سنتين **وله راتب هذه السنة** بلا شهر 13
 $healSt152 = (string)getSetting('heal_pm12_20260920', '');
 // بطاقة سنة ماضية بـ10 أشهر مخزّنة: لا صفوف «—» لآب/أيلول
 $past152 = $db->query("SELECT e.id, e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND COALESCE(ms.is_indemnity_month,0) = 0
-    WHERE e.is_deleted = 0 GROUP BY e.id HAVING COUNT(*) = 10 AND MAX(ms.year*12+ms.month) = 2026*12+7 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    WHERE e.is_deleted = 0 AND e.hire_date < '2025-10-01' GROUP BY e.id HAVING COUNT(*) = 10 AND MAX(ms.year*12+ms.month) = 2026*12+7 ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $okPast152 = true; $dash152 = -1;
 if ($past152 && strcmp('2025-2026', currentSchoolYear()) < 0) {
     $hp152 = renderPage('pages/annual_slip.php', ['employee_id' => (int)$past152['id'], 'school_year' => '2025-2026'], ['extra', 'aide', 'transport'], [(int)$past152['school_id']], 'lbp', '2025-2026');
@@ -8092,7 +8092,7 @@ $hN = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' =>
 $c169('live-none', $noFatal($hN) && strpos($hN, 'لا توجد بيانات') !== false && strpos($hN, '— بلا فئة مشيّكة') !== false);
 $hT = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026, 'emp_type_set' => '1', 'emp_type' => ['enseignant_titulaire', 'employe']], []);
 preg_match('/مجموع كل الفئات \(العدد: (\d+)\)/u', $hT, $mT);
-$expT = $q34(" AND e.employee_type IN ('enseignant_titulaire','employe')");
+$expT = $q34(" AND IF(e.employee_type <> 'enseignant_titulaire' AND COALESCE(e.contract_from_sy,'') > '2025-2026', 'enseignant_titulaire', e.employee_type) IN ('enseignant_titulaire','employe')");
 $c169('live-two=' . ($mT[1] ?? '?') . '/' . $expT, $noFatal($hT) && isset($mT[1]) && (int)$mT[1] === $expT && $expT > 0 && strpos($hT, '— الملاك + الموظفين') !== false
       && preg_match('/name="emp_type\[\]" value="enseignant_titulaire" checked/', $hT) === 1 && preg_match('/name="emp_type\[\]" value="enseignant_contractuel"(?! checked)/', $hT) === 1);
 // النماذج الرسمية: كشف رواتب كل الموظفين (مدرسة 3) — فئتان = مجموع كلٍّ لحاله، وولا واحدة = 0
@@ -12329,6 +12329,10 @@ if (getenv('REG_TIMING')) {
     $tl .= sprintf("%.2f\t\t\tTOTAL\n", microtime(true) - ($GLOBALS['REG_T0'] ?? microtime(true)));
     @file_put_contents($PROJ . '/tmp/_reg_timing.tsv', $tl);
 }
+
+// 🛡️ (2026-11-27) صفة الموظف حسب السنة: مَن كان ملاكاً وصار متعاقداً يبقى ملاكاً بسنواته قبلها — بكل استعلام وكل صفّ مجلوب (عملية مستقلّة)
+$gTA = (string)shell_exec('"' . PHP_BINARY . '" ' . escapeshellarg(__DIR__ . '/garde_type_annee.php') . ' 2>&1');
+check('🛡️ حارس صفة السنة: كل مَن تحوّل من ملاك إلى متعاقد يظهر بصفته الصحيحة بكل سنة (استعلام + صفّ + فلتر الفئة + صندوق)', strpos($gTA, '✅') !== false, trim(mb_substr($gTA, 0, 300)));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

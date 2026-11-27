@@ -15,6 +15,7 @@ $db = getDB();
 $format = in_array($_GET['format'] ?? 'pdf', ['pdf', 'xlsx', 'docx'], true) ? $_GET['format'] : 'pdf';
 $schoolYear = $_GET['school_year'] ?? activeSchoolYear();
 if ($schoolYear === 'all') $schoolYear = currentSchoolYear();
+msaTypeYear($schoolYear);   // 🔁 الفئة بصفة السنة المعروضة
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 $all = !empty($_GET['all']);
 
@@ -141,7 +142,7 @@ if ($all) {
     $sql = "SELECT e.* FROM employees e WHERE e.is_deleted = 0" . schoolScopeSql('e.school_id') . $yf;
     $params = $yp;
     $sql .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
-    $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
+    $sql .= " ORDER BY FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $emps = $stmt->fetchAll();

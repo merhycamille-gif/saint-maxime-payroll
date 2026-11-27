@@ -583,6 +583,9 @@ class PayrollCalculator {
             $rowRankC = ($this->month >= 10) ? $this->year : $this->year - 1;
             if ($rowRankC < (int)$cm[1]) return $this->calculate(); // بلا أي حفظ — سنة كان فيها متعاقداً
         }
+        // 🔁 (2026-11-27) العكس: سنة كان فيها ملاكاً ثم صار متعاقداً (contract_from_sy) — رواتبها مدفوعة كملاك، لا يُعاد حسابها بمحرّك المتعاقد
+        $rowRankK = ($this->month >= 10) ? $this->year : $this->year - 1;
+        if (empYearBeforeContract($this->employee, sprintf('%04d-%04d', $rowRankK, $rowRankK + 1))) return $this->calculate();
         // 🔴 قاعدة التارك (§١٠): مَن له تاريخ ترك لا يُحفَظ له راتب في سنة دراسية تبدأ
         // **بعد** تاريخ تركه — من أي مسار كان (فتح سنة/إعادة حساب/زرّ احتساب/شفاء ذاتي).
         // يبقى راتبه يُحسب لكل أشهر سنة تركه حتى 30-9 (رتبة السنة نفسها مسموحة).
@@ -594,6 +597,8 @@ class PayrollCalculator {
             $depRank = ((int)substr($ld, 5, 2) >= 10) ? (int)substr($ld, 0, 4) : (int)substr($ld, 0, 4) - 1;
             $rowRank = ($this->month >= 10) ? $this->year : $this->year - 1;
             if ($rowRank > $depRank) return $this->calculate(); // بلا أي حفظ — سنة بعد الترك
+            // ⚖️ 27/11/2026 (المدير: «أستاذ عندو راتب، إذا ترك من تاريخ الترك ببطّل في راتب»): شهر يبدأ بعد تاريخ الترك لا يُحفَظ له راتب أبداً، ولو بسنة تركه نفسها.
+            if (sprintf('%04d-%02d-01', (int)$this->year, (int)$this->month) > $ld) return $this->calculate();
         }
         // 🔒 قفل السنة (2026-09-12): سنة مقفولة لمدرسة الموظف = الحسابات ما بتتغيّر من أي مسار (احتساب/فتح/شفاء/مكافآت) — بلا حفظ
         if (isSchoolYearLocked((int)($this->employee['school_id'] ?? 0), schoolYearOfMonth((int)$this->year, (int)$this->month))) return $this->calculate();
@@ -760,6 +765,8 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
     // 🎓 المرسَّم من متعاقد: سنواته قبل سنة ترسيمه لا تُحسب (الصمام نفسه بـcalculateAndSave — هنا اختصار)
     try { $cfsR = (string)$db->query("SELECT cadre_from_sy FROM employees WHERE id = " . (int)$employeeId)->fetchColumn(); } catch (Throwable $ex) { $cfsR = ''; }
     if (preg_match('/^(\d{4})-\d{4}$/', $cfsR, $cfm) && (int)$mm[1] < (int)$cfm[1]) return 0;
+    try { $ekR = $db->query("SELECT employee_type, contract_from_sy FROM employees WHERE id = " . (int)$employeeId)->fetch(PDO::FETCH_ASSOC) ?: []; } catch (Throwable $ex) { $ekR = []; }
+    if ($ekR && empYearBeforeContract($ekR, (string)$sy)) return 0;   // 🔁 سنة كان فيها ملاكاً قبل أن يصير متعاقداً
 
     // 📅 (2026-09-23 قراره «بس تغيّر شغلة لازم تتغيّر بس بالسنة اللي بتغيّر فيها») النداء بلا سنة = السنة المعروضة فقط
     //    (كان منذ 2026-08-06 يعيد أيضاً السنة التقويمية وكل السنين المفتوحة اللاحقة). البنود تُحفَظ على السنة المعروضة (writeSchoolYear)

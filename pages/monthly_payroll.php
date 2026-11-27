@@ -22,6 +22,7 @@ $typeFilter = (!$typeState['all'] && count($typeState['sel']) === 1) ? $typeStat
 $typeQ = empTypeQueryFrom($typeState, 'type'); // لاحقة الروابط (تبدأ بـ&)
 // السنة الدراسية التي يقع فيها الشهر المختار (تشرين الأول→أيلول) — لفلترة موظفي تلك السنة فقط
 $msSchoolYear = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) . '-' . $year);
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') msaTypeYear($msSchoolYear);   // 🔁 العرض بصفة سنة الشهر (الحفظ/الحساب يبقى على الملف)
 
 /**
  * يرسم قسيمة راتب أستاذ/موظف كاملة (نفس أرقام العرض الفردي) — تُستعمل
@@ -263,7 +264,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     $sqlP .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
     $idsSelP = array_filter(array_map('intval', explode(',', (string)($_GET['ids'] ?? '')))); // ☑️ v2026 اختيار جماعي من اللائحة
     if ($idsSelP) $sqlP .= " AND e.id IN (" . implode(',', $idsSelP) . ")";
-    $sqlP .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
+    $sqlP .= " ORDER BY FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $stmtP = $db->prepare($sqlP);
     $stmtP->execute($paramsP);
     $empsP = $stmtP->fetchAll();
@@ -469,7 +470,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     //   🔴 لا يتغيّر أي رقم: نفس الاستعلام والدوال (money/rowUsd/dualFromUsd) — أُضيفت أعمدة القسيمة المخزّنة للعرض فقط.
     // ═══════════════════════════════════════════════════════════════════════════════════════
     $pmM = $month === 1 ? 12 : $month - 1; $pmY = $month === 1 ? $year - 1 : $year; // الشهر الماضي (للمقارنة)
-    $sql = "SELECT e.id, e.school_id, e.employee_code, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.employee_type, e.current_grade,
+    $sql = "SELECT e.id, e.school_id, e.employee_code, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, " . empTypeAtSql('e.') . " AS employee_type, e.current_grade,
                    ms.total_due_lbp, ms.total_due_usd, ms.net_salary_lbp, ms.net_salary_usd, ms.is_calculated, ms.exchange_rate, ms.month, ms.year,
                    ms.base_plus_echelon_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.prime_fixe_usd_law, ms.total_retenues_lbp,
                    ms.family_allowance_lbp, ms.transport_lbp,
@@ -483,7 +484,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     $sql .= $lyf;
     $listParams = array_merge([$month, $year, $pmM, $pmY], $lyp);
     $sql .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
-    $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
+    $sql .= " ORDER BY FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $stmt = $db->prepare($sql);
     $stmt->execute($listParams);
     $list = $stmt->fetchAll();

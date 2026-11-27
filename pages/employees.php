@@ -656,6 +656,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             // 🎓 (2026-09-13) صار ملاكاً بيد المستخدم (كان متعاقداً/موظفاً) وبلا أي سجلّ درجات ⇒ تُبنى درجاته بالقانون كالجديد
             $becameCadre = ($oldDates && ($oldDates['employee_type'] ?? '') !== 'enseignant_titulaire' && $data['employee_type'] === 'enseignant_titulaire'
                             && (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = " . (int)$id)->fetchColumn() === 0);
+            // 🔁 (2026-11-27) كان ملاكاً وصار متعاقداً/موظفاً بيد المستخدم ⇒ «متعاقد من هذه السنة»: سنواته السابقة تبقى ملاكاً كما دُفعت (كشوف + صندوق + لا إعادة حساب)
+            try {
+                if (function_exists('cadreDueEnsureColumns')) cadreDueEnsureColumns($db);
+                if ($oldDates && ($oldDates['employee_type'] ?? '') === 'enseignant_titulaire' && $data['employee_type'] !== 'enseignant_titulaire') {
+                    $db->prepare("UPDATE employees SET contract_from_sy = COALESCE(contract_from_sy, ?) WHERE id = ?")->execute([currentSchoolYear(), $id]);
+                } elseif ($data['employee_type'] === 'enseignant_titulaire') {
+                    $db->prepare("UPDATE employees SET contract_from_sy = NULL WHERE id = ? AND contract_from_sy IS NOT NULL")->execute([$id]);
+                }
+            } catch (Throwable $t) {}
             if ($becameCadre) $diplomaChanged = true; // نفس مسار «تغيّرت الشهادة»: درجة الدخول من الشهادة + بناء + إعادة حساب
             // 🛡️ (2026-09-13، حادثة جنى لبوس) صار ملاكاً بيده وله رواتب سنين سابقة كمتعاقد ⇒ صمام cadre_from_sy قبل أي إعادة حساب
             //    حتى لا تُستبدَل سنواته السابقة بالسلسلة (يُحسب كملاك من سنة ملاكه فقط)

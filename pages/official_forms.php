@@ -28,6 +28,7 @@ if ($schoolYear === 'all') $schoolYear = currentSchoolYear();
 // 🔒 تحقّق من شكل السنة: قيمة غير صالحة كانت تُفرِّغ فلتر السنة (yearEmploymentFilter)
 // فيُحتسب كل التاريخ بالتصاريح المؤسّسية، وتُسبّب «Undefined array key 1» بتفكيك السنة.
 if (!preg_match('/^\d{4}-\d{4}$/', (string)$schoolYear)) $schoolYear = currentSchoolYear();
+msaTypeYear($schoolYear);   // 🔁 الفئة بصفة السنة المعروضة
 $month = ($month >= 1 && $month <= 12) ? $month : (int)date('n');
 $year  = ($year >= 2000 && $year <= 2100) ? $year : (int)date('Y');
 $school = currentSchool();
@@ -427,13 +428,13 @@ if (in_array($form, $perEmployee) && !$emp):
     // فلترة حسب السنة الدراسية المختارة (دالة موحّدة): سنة محددة = موظفو تلك السنة فقط (إلهم رواتب فيها)
     [$yearWhere, $yearParams] = yearEmploymentFilter(activeSchoolYear());
     // تقييد لائحة الاختيار حسب النموذج: خاص بالموظف الإداري / بالملاك / بالأساتذة
-    $onlyEmp = in_array($form, $employeeOnly) ? " AND employee_type='employe'"
-             : (in_array($form, $laborLawOnly) ? " AND employee_type IN ('employe','enseignant_contractuel')"
-             : (in_array($form, $titulaireOnly) ? " AND employee_type='enseignant_titulaire'"
-             : (in_array($form, $teacherOnly) ? " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')" : '')));
+    $onlyEmp = in_array($form, $employeeOnly) ? " AND " . empTypeAtSql('') . "='employe'"
+             : (in_array($form, $laborLawOnly) ? " AND " . empTypeAtSql('') . " IN ('employe','enseignant_contractuel')"
+             : (in_array($form, $titulaireOnly) ? " AND " . empTypeAtSql('') . "='enseignant_titulaire'"
+             : (in_array($form, $teacherOnly) ? " AND " . empTypeAtSql('') . " IN ('enseignant_titulaire','enseignant_contractuel')" : '')));
     $list = $db->prepare("SELECT id, first_name_fr, last_name_fr, first_name_ar, last_name_ar, father_name_ar, father_name_fr, employee_code, phone1, phone2
                           FROM employees WHERE is_deleted = 0 AND " . schoolScopeWhere('school_id') . $onlyEmp . $yearWhere . "
-                          ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
+                          ORDER BY FIELD(" . empTypeAtSql('') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $list->execute($yearParams);
     $emps = $list->fetchAll();
 ?>
@@ -618,7 +619,7 @@ if (in_array($form, $imageForms)) {
         $st = "$y1f-10-01"; $en = "$y2f-09-30";
         $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $ofEmpFilterPlain . "
             AND " . leftDateSqlFor('finance') . " BETWEEN ? AND ?
-            ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
+            ORDER BY FIELD(" . empTypeAtSql('') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
         $q->execute([$st,$en]);
         $lrows = $q->fetchAll();
         $ys = 26.0; $dy = 3.62;
@@ -940,7 +941,7 @@ elseif ($form === 'tax_emp_report'):
             $syQ = ($qq === 4) ? ($y . '-' . ($y + 1)) : (($y - 1) . '-' . $y);
             [$yfq, $ypq] = yearEmploymentFilter($syQ, 'e.');
             $inQ = implode(',', $months);
-            $st = $db->prepare("SELECT e.id, e.school_id, e.employee_type,
+            $st = $db->prepare("SELECT e.id, e.school_id, " . empTypeAtSql('e.') . " AS employee_type,
                     e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                     e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction,1) afd, COALESCE(e.grant_spouse_addition,0) gsa, COALESCE(e.grant_children_addition,0) gca,
                     SUM(ms.base_plus_echelon_lbp) base, SUM(ms.extra_lbp+ms.prime_fixe_lbp) extraw,
@@ -1304,7 +1305,7 @@ elseif ($form === 'teacher_card'):
     // بيان عام بمعلومات عن أفراد الهيئة التعليمية (متعاقدين / ملاك / الكل) — مطابق Ecole.exe
     $cat = $_GET['cat'] ?? 'all';   // all | titulaire | contractuel
     $catSql = '';
-    $catSql = " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')";   // ⚖️ 27/11/2026: الفئة تُحدَّد بعد الجلب من المصدر الواحد empFundKind() (ملاك بلغ 64 = متعاقد عند الصندوق)
+    $catSql = " AND " . empTypeAtSql('') . " IN ('enseignant_titulaire','enseignant_contractuel')";   // ⚖️ 27/11/2026: الفئة تُحدَّد بعد الجلب من المصدر الواحد empFundKind() (ملاك بلغ 64 = متعاقد عند الصندوق)
     $catTitle = ['titulaire'=>'الداخلين في الملاك', 'contractuel'=>'المتعاقدين'][$cat] ?? 'المتعاقدين والملاك';
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear());
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $catSql . $yf . $ofEmpFilterPlain . "
@@ -1412,7 +1413,7 @@ elseif ($form === 'teacher_card'):
     // بيان عام — صندوق التعويضات (ملاك / متعاقدين) — طبق نموذج صندوق التعويضات الرسمي
     $cat = ($_GET['cat'] ?? 'titulaire') === 'contractuel' ? 'contractuel' : 'titulaire';
     $isMlk = ($cat === 'titulaire');
-    $typeSql = "employee_type IN ('enseignant_titulaire','enseignant_contractuel')";   // ⚖️ 27/11/2026: الفئة من المصدر الواحد empFundKind() بعد الجلب — ملاك بلغ 64 يطلع ببيان المتعاقدين لا الملاك
+    $typeSql = empTypeAtSql('') . " IN ('enseignant_titulaire','enseignant_contractuel')";   // ⚖️ 27/11/2026: الفئة من المصدر الواحد empFundKind() بعد الجلب — ملاك بلغ 64 يطلع ببيان المتعاقدين لا الملاك
     $catTitle = $isMlk ? 'الداخلين في الملاك' : 'المتعاقدين';
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear());
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . " AND $typeSql" . $yf . $ofEmpFilterPlain . "
@@ -1587,7 +1588,7 @@ elseif ($form === 'teacher_card'):
             COUNT(DISTINCT ms.month) months, MAX(ms.caisse_amount_lbp) monthlyCaisse,
             SUM(ms.caisse_amount_lbp) qCaisse, SUM(ms.eoc_grade_lbp) gradeHalf
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
-        WHERE e.employee_type='enseignant_titulaire' AND e.is_deleted=0" . $ofYearFilter . "
+        WHERE " . empTypeAtSql('e.') . "='enseignant_titulaire' AND e.is_deleted=0" . $ofYearFilter . "
               AND ms.year=? AND ms.month IN ($ph) AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
         GROUP BY e.id
         ORDER BY e.school_id, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
@@ -1724,10 +1725,10 @@ elseif ($form === 'teacher_card'):
 </div>
 
 <?php elseif ($form === 'salary_all'):
-    $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, ms.*
+    $stmt = $db->prepare("SELECT " . empTypeAtSql('e.') . " AS employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
-                          ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
+                          ORDER BY FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
     $T = ['base'=>0,'ech'=>0,'bpe'=>0,'extra'=>0,'aide'=>0,'caisse'=>0,'fded'=>0,'txb'=>0,'tax'=>0,'cnss'=>0,'ded'=>0,'fam'=>0,'trans'=>0,'due'=>0,'net'=>0];
@@ -1843,7 +1844,7 @@ elseif ($form === 'teacher_card'):
 <?php elseif ($form === 'differences'):
     [$cy1] = schoolYearToYears($schoolYear);
     $prevSY = ($cy1-1).'-'.$cy1;
-    $q = $db->prepare("SELECT e.id, e.employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
+    $q = $db->prepare("SELECT e.id, " . empTypeAtSql('e.') . " AS employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                    SUM(CASE WHEN ms.school_year=? THEN ms.net_salary_lbp ELSE 0 END) AS cur,
                    SUM(CASE WHEN ms.school_year=? THEN ms.net_salary_lbp ELSE 0 END) AS prev,
                    SUM(CASE WHEN ms.school_year=? THEN ms.extra_lbp+ms.prime_fixe_lbp ELSE 0 END) AS extra_wage,
@@ -1861,7 +1862,7 @@ elseif ($form === 'teacher_card'):
                    SUM(CASE WHEN ms.school_year=? THEN FLOOR(ms.net_salary_lbp/NULLIF(ms.exchange_rate,0)) ELSE 0 END) AS prev_usd
             FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
             WHERE e.is_deleted=0 AND ms.school_year IN (?, ?) AND " . schoolScopeWhere('e.school_id') . "
-            GROUP BY e.id, e.employee_type HAVING (cur>0 OR prev>0) ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
+            GROUP BY e.id, " . empTypeAtSql('e.') . " HAVING (cur>0 OR prev>0) ORDER BY FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $q->execute([$schoolYear, $prevSY, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $prevSY, $schoolYear, $prevSY]);
     $rows = $q->fetchAll();
     $tc=0;$tp=0;$tEx=0;$tAi=0;$tBase=0;
@@ -2103,7 +2104,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     $start = "$y1-10-01"; $end = "$y2-09-30";
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $ofEmpFilterPlain . "
         AND " . leftDateSqlFor('finance') . " BETWEEN ? AND ?
-        ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
+        ORDER BY FIELD(" . empTypeAtSql('') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $q->execute([$start,$end]);
     $rows = $q->fetchAll();
 ?>
@@ -2313,12 +2314,12 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     $q2 = $db->prepare("SELECT COUNT(DISTINCT CASE WHEN ms.school_end_of_service_8_5_lbp>0 THEN ms.employee_id END) n,
             COALESCE(SUM(ms.school_end_of_service_8_5_lbp),0) c
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
+        WHERE " . empTypeAtSql('e.') . "='employe' AND e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
     $q2->execute($params); $t = $q2->fetch();
     $q2b = $db->prepare("SELECT COUNT(DISTINCT CASE WHEN ms.school_family_comp_6_lbp>0 THEN ms.employee_id END) n,
             COALESCE(SUM(ms.school_family_comp_6_lbp),0) c
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
+        WHERE " . empTypeAtSql('e.') . "='employe' AND e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
     $q2b->execute($params); $fam = $q2b->fetch();
     // 👨‍👩‍👧 التعويضات العائلية المدفوعة = موظفو قانون العمل فقط (تعويض أستاذ الملاك من المدرسة لا يدخل الضمان — 2026-09-25)
     $q3 = $db->prepare("SELECT COALESCE(SUM(ms.family_allowance_lbp),0) f FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
@@ -2594,12 +2595,12 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
  * ====================================================================== */
 elseif ($form === 'payment_list'):
     // كشف الدفع: لائحة الرواتب الصافية للموظفين (لشهر) — للدفع/التحويل المصرفي + توقيع
-    $stmt = $db->prepare("SELECT e.employee_type, e.employee_code, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
+    $stmt = $db->prepare("SELECT " . empTypeAtSql('e.') . " AS employee_type, e.employee_code, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                                  e.nssf_number, e.birth_date, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.exchange_rate, ms.net_salary_lbp, ms.total_due_lbp, ms.family_allowance_lbp, ms.transport_lbp,
                                  ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
-                          ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
+                          ORDER BY FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
     $tNet=0; $tDue=0; $tEx=0; $tAi=0; $tBase=0; $tTrans=0;
@@ -2669,11 +2670,11 @@ elseif ($form === 'payment_list'):
 
 <?php elseif ($form === 'full_register'):
     // جميع الأساتذة — كشف شامل بالكلفة (مطابق p5): لكل أستاذ الراتب + مساهمات المؤسسة + الكلفة
-    $stmt = $db->prepare("SELECT e.school_id, e.employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
+    $stmt = $db->prepare("SELECT e.school_id, " . empTypeAtSql('e.') . " AS employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                                  e.hours_per_week, " . familyDedSelectCols('e') . ", ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
-                          ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
+                          ORDER BY e.school_id, FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
     $multiS = (count(activeSchoolIds()) !== 1);
@@ -2863,7 +2864,7 @@ elseif ($form === 'payment_list'):
 <?php elseif ($form === 'staff_stats'):
     // إحصاءات الموظفين: توزيع حسب النوع/الشهادة/الحالة + متوسط الدرجة
     [$yf,$yp] = yearEmploymentFilter(activeSchoolYear());
-    $byType = $db->prepare("SELECT employee_type t, COUNT(*) c FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain . " GROUP BY employee_type");
+    $byType = $db->prepare("SELECT " . empTypeAtSql('') . " t, COUNT(*) c FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain . " GROUP BY " . empTypeAtSql('') . "");
     $byType->execute($yp); $types = $byType->fetchAll();
     $byStatus = $db->prepare("SELECT status s, COUNT(*) c FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain . " GROUP BY status");
     $byStatus->execute($yp); $statuses = $byStatus->fetchAll();
@@ -2903,7 +2904,7 @@ elseif ($form === 'payment_list'):
     // معلومات عامة عن الموظفين (مطابق Ecole.exe — p13)
     [$yf,$yp] = yearEmploymentFilter(activeSchoolYear());
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain . "
-                       ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
+                       ORDER BY FIELD(" . empTypeAtSql('') . ",'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $q->execute($yp); $rows = $q->fetchAll();
     $today = new DateTime();
 ?>
@@ -2960,7 +2961,7 @@ elseif ($form === 'payment_list'):
     //   الأرقام مأخوذة كما خزّنها محرّك البرنامج لكل شهر (مع سقف الأجر الخاضع لكل فرع).
     // فلتر «موظفي الفترة» الموحّد محسوب بأعلى الملف حسب شهر/سنة الكشف ($ofMonthFilter/$ofMonthParams).
     $sql = "SELECT e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
-                   e.nssf_number, e.birth_date, e.employee_type, e.hire_date,
+                   e.nssf_number, e.birth_date, " . empTypeAtSql('e.') . " AS employee_type, e.hire_date,
                    ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp, ms.transport_lbp, ms.taxable_base_lbp,
                    ms.cnss_amount_lbp, ms.school_cnss_8_lbp,
                    ms.school_end_of_service_8_5_lbp, ms.school_family_comp_6_lbp, ms.family_allowance_lbp
@@ -2968,7 +2969,7 @@ elseif ($form === 'payment_list'):
             WHERE e.is_deleted = 0 AND e.cnss_subject = 1" . $ofMonthFilter . $ofEmpFilter . "
               AND ms.year = ? AND ms.month = ? AND " . schoolScopeWhere('ms.school_id') . "
               AND (ms.taxable_base_lbp > 0 OR ms.cnss_amount_lbp > 0 OR ms.base_plus_echelon_lbp > 0)
-            ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
+            ORDER BY FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'),
                      REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $st = $db->prepare($sql);
     $st->execute(array_merge($ofMonthParams, [$year, $month]));
@@ -3112,12 +3113,12 @@ elseif ($form === 'payment_list'):
 <?php elseif ($form === 'salary_detail'):
     // معلومات تفصيلية عن الراتب — جميع الأساتذة/الموظفون (مطابق p3/p4): مجمّع حسب الفئة،
     // صفّ «المجموع» لكل فئة + مجموع عام. الأعمدة من جدول monthly_salaries كما يخزّنها المحرّك.
-    $sql = "SELECT e.first_name_ar,e.last_name_ar, e.father_name_ar, e.father_name_fr,e.first_name_fr,e.last_name_fr,e.employee_type, " . familyDedSelectCols('e') . ", ms.*
+    $sql = "SELECT e.first_name_ar,e.last_name_ar, e.father_name_ar, e.father_name_fr,e.first_name_fr,e.last_name_fr," . empTypeAtSql('e.') . " AS employee_type, " . familyDedSelectCols('e') . ", ms.*
             FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
             WHERE ms.month=? AND ms.year=? AND e.is_deleted=0
               AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $ofMonthFilter . $ofEmpFilter . "
               AND " . schoolScopeWhere('e.school_id') . "
-            ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
+            ORDER BY FIELD(" . empTypeAtSql('e.') . ",'enseignant_titulaire','enseignant_contractuel','employe'),
                      REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $st = $db->prepare($sql);
     $st->execute(array_merge([$month, $year], $ofMonthParams));

@@ -13,6 +13,7 @@ requireLogin();
 $db = getDB();
 $form = $_GET['form'] ?? '';
 $format = ($_GET['format'] ?? 'pdf') === 'xlsx' ? 'xlsx' : 'pdf';
+msaTypeYear((string)($_GET['school_year'] ?? activeSchoolYear()));   // 🔁 الفئة بصفة السنة المعروضة
 $month = (int)($_GET['month'] ?? date('n'));
 $year = (int)($_GET['year'] ?? date('Y'));
 /* =====================================================================
@@ -338,12 +339,12 @@ if ($form === 'cnss_contrib_monthly') {
     $q2 = $db->prepare("SELECT COUNT(DISTINCT CASE WHEN ms.school_end_of_service_8_5_lbp>0 THEN ms.employee_id END) n,
             COALESCE(SUM(ms.school_end_of_service_8_5_lbp),0) c
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month=? AND " . schoolScopeWhere('ms.school_id'));
+        WHERE " . empTypeAtSql('e.') . "='employe' AND e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month=? AND " . schoolScopeWhere('ms.school_id'));
     $q2->execute($params); $t = $q2->fetch();
     $q2b = $db->prepare("SELECT COUNT(DISTINCT CASE WHEN ms.school_family_comp_6_lbp>0 THEN ms.employee_id END) n,
             COALESCE(SUM(ms.school_family_comp_6_lbp),0) c
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month=? AND " . schoolScopeWhere('ms.school_id'));
+        WHERE " . empTypeAtSql('e.') . "='employe' AND e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month=? AND " . schoolScopeWhere('ms.school_id'));
     $q2b->execute($params); $fam = $q2b->fetch();
     // 👨‍👩‍👧 التعويضات العائلية المدفوعة = موظفو قانون العمل فقط (المصدر الواحد cnssFamilyPaidTypeSql — 2026-09-25)
     $q3 = $db->prepare("SELECT COALESCE(SUM(ms.family_allowance_lbp),0) f FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id

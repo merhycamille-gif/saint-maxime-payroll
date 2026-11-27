@@ -256,7 +256,7 @@ function complianceItems(PDO $db, string $sy): array {
 
     // ── 8) نسبة عند غير الملاك ──
     foreach ($q("SELECT e.*, GROUP_CONCAT(b.id) ids, GROUP_CONCAT(b.amount) amts FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id
-        WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire' AND b.is_active = 1 AND b.value_type = 'percent' AND (b.school_year IS NULL OR b.school_year = ?)" . $sc . " GROUP BY e.id", [$sy]) as $r) {
+        WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire' AND (e.contract_from_sy IS NULL OR e.contract_from_sy <= ?) AND b.is_active = 1 AND b.value_type = 'percent' AND (b.school_year IS NULL OR b.school_year = ?)" . $sc . " GROUP BY e.id", [$sy, $sy]) as $r) {
         $add('pct_nontit', $r, 'عنده بند نسبة (' . str_replace(',', ' % / ', rtrim($r['amts'], '0')) . ' %) وهو ' . ($r['employee_type'] === 'employe' ? 'موظف إداري' : 'متعاقد') . ' — قانون النسبة للملاك فقط',
             'إطفاء بند النسبة وإعادة حساب سنة ' . $sy . ' (وإدخال مبلغه الثابت بملفه إن لزم)', true, ['off' => array_map('intval', explode(',', $r['ids']))]);
     }
@@ -267,13 +267,13 @@ function complianceItems(PDO $db, string $sy): array {
         $add('bonus_nosy', $r, 'عنده ' . (int)$r['n'] . ' بند علاوة بلا سنة دراسية — ينطبق على كل السنين (خطر تكرار)', 'تثبيت هذه البنود على سنة ' . $sy, true, ['ids' => array_map('intval', explode(',', $r['ids']))]);
     }
 
-    // ── 10) تارك عنده رواتب بعد تركه (بنفس السنة — الأشهر التالية لشهر الترك +1) ──
+    // ── 10) تارك عنده رواتب بعد تركه (بنفس السنة — كل شهر يبدأ بعد تاريخ الترك؛ 27/11/2026 أُلغي شهر السماح) ──
     $ldAll = leftDateSql('e.'); // 🚪 الترك من الكل فقط (2026-09-18)
     foreach ($q("SELECT e.*, $ldAll ld,
             COUNT(*) n, SUM(ms.net_salary_lbp) net, MIN(ms.year*100+ms.month) m1, MAX(ms.year*100+ms.month) m2
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
         WHERE e.is_deleted = 0" . $sc . " AND $ldAll < '9999-12-31'
-          AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > DATE_ADD($ldAll, INTERVAL 1 MONTH)
+          AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > $ldAll   /* ⚖️ 27/11/2026 (المدير، للمرّة الثانية: «من تاريخ الترك ببطّل في راتب»): أيّ شهر يبدأ بعد تاريخ الترك — كان يُسمَح بشهر إضافي (+1) فبقي لكل تارك شهر بعد تركه */
         GROUP BY e.id", [$sy]) as $r) {
         $m1 = (int)$r['m1']; $m2 = (int)$r['m2'];
         $add('left_rows', $r, 'ترك بتاريخ ' . formatDate($r['ld']) . ' وعنده ' . (int)$r['n'] . ' أشهر مخزّنة بعد تركه (' . complianceMonthLabel($m1 % 100, intdiv($m1, 100)) . ' → ' . complianceMonthLabel($m2 % 100, intdiv($m2, 100)) . ') مجموع صافيها ' . complianceFmt($r['net']) . ' ل.ل',
@@ -700,7 +700,7 @@ function complianceApply(PDO $db, array $it): string {
         case 'left_rows':
             $ld = (string)($d['ld'] ?? '');
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $ld)) return 'تاريخ ترك غير صالح';
-            $st = $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND STR_TO_DATE(CONCAT(year,'-',month,'-01'),'%Y-%m-%d') > DATE_ADD(?, INTERVAL 1 MONTH)");
+            $st = $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND STR_TO_DATE(CONCAT(year,'-',month,'-01'),'%Y-%m-%d') > ?");   // ⚖️ 27/11/2026: بلا شهر السماح
             $st->execute([$eid, $sy, $ld]);
             logAudit('compliance_left_rows_delete', 'monthly_salaries', $eid, null, ['sy' => $sy, 'deleted' => $st->rowCount(), 'left' => $ld]);
             return 'حُذف ' . $st->rowCount() . ' شهراً بعد تركه (' . formatDate($ld) . ')';

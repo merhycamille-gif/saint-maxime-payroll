@@ -105,7 +105,7 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026', array $schoolIds = []
     $pctEx = $pctAllow[$sy] ?? [];
     $add('pct_nontit', 'سطر نسبة ٪ فعّال عند متعاقد أو موظف (النسبة للملاك فقط)', $q("
         SELECT $nm nm FROM employees e JOIN employee_bonuses b ON b.employee_id=e.id AND b.is_active=1 AND b.value_type='percent' AND (b.school_year IS NULL OR b.school_year=?)
-        WHERE e.is_deleted=0 AND e.employee_type<>'enseignant_titulaire'" . ($pctEx ? " AND e.id NOT IN (" . implode(',', array_map('intval', $pctEx)) . ")" : '') . " GROUP BY e.id", [$sy]));
+        WHERE e.is_deleted=0 AND e.employee_type<>'enseignant_titulaire' AND (e.contract_from_sy IS NULL OR e.contract_from_sy <= " . getDB()->quote($sy) . ")" . ($pctEx ? " AND e.id NOT IN (" . implode(',', array_map('intval', $pctEx)) . ")" : '') . " GROUP BY e.id", [$sy]));
 
     // 10) سطر علاوة بلا سنة (ينطبق على كل السنين)
     $add('bonus_nosy', 'سطر علاوة فعّال بلا سنة دراسية (ينطبق على كل السنين — خطر)', $q("
@@ -137,7 +137,7 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026', array $schoolIds = []
     $add('left_rows', 'تارك عنده رواتب مخزّنة بعد تاريخ تركه', $q("
         SELECT $nm nm FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
         WHERE e.is_deleted=0 AND " . leftDateSql('e.') . " < '9999-12-31'
-          AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > DATE_ADD(" . leftDateSql('e.') . ", INTERVAL 1 MONTH)
+          AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > " . leftDateSql('e.') . "   /* ⚖️ 27/11/2026: بلا شهر السماح — «من تاريخ الترك ببطّل في راتب» */
         GROUP BY e.id"));
 
     // 15ب) ⚖️ 27/11/2026 (تدقيق «ما بدّي بقى أخطاء»): محسوم مخزَّن بشهر لم يعد الموظف خاضعاً فيه لتلك الجهة (ترك الضمان/المالية/الصندوق، أو ملاك بلغ 64)

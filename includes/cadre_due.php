@@ -28,6 +28,16 @@ function cadreDueEnsureColumns(?PDO $db = null): void {
         if (!msaHasCol($db, 'employees', 'cadre_from_sy')) {
             $db->exec("ALTER TABLE employees ADD COLUMN cadre_from_sy VARCHAR(9) NULL DEFAULT NULL COMMENT 'رُسِّم بالملاك من متعاقد ابتداءً من هذه السنة الدراسية'");
         }
+        // 🔁 (2026-11-27، جوزف السرّوع: صار متعاقداً بعد الـ64) العكس: كان ملاكاً وصار متعاقداً ابتداءً من هذه السنة — سنواته قبلها تبقى «ملاك» كما دُفعت
+        if (!msaHasCol($db, 'employees', 'contract_from_sy')) {
+            $db->exec("ALTER TABLE employees ADD COLUMN contract_from_sy VARCHAR(9) NULL DEFAULT NULL COMMENT 'كان ملاكاً وصار متعاقداً ابتداءً من هذه السنة الدراسية'");
+        }
+        if (getSetting('heal_contract_from_sy_20261127', '') === '') {   // مَن ليس ملاكاً اليوم وحُسم عنه للصندوق بسنين سابقة ⇒ متعاقد من السنة التي تلي آخر سنة صندوق
+            foreach ($db->query("SELECT e.id, MAX(ms.school_year) m FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.caisse_amount_lbp > 0 WHERE e.employee_type <> 'enseignant_titulaire' AND e.contract_from_sy IS NULL GROUP BY e.id")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                if (preg_match('/^(\d{4})-(\d{4})$/', (string)$r['m'], $mm)) $db->prepare("UPDATE employees SET contract_from_sy = ? WHERE id = ?")->execute([sprintf('%04d-%04d', (int)$mm[1] + 1, (int)$mm[2] + 1), (int)$r['id']]);
+            }
+            setSetting('heal_contract_from_sy_20261127', date('Y-m-d H:i:s'));
+        }
     } catch (Throwable $e) { $done = false; }
 }
 
