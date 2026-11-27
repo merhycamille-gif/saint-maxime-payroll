@@ -1304,16 +1304,16 @@ elseif ($form === 'teacher_card'):
     // بيان عام بمعلومات عن أفراد الهيئة التعليمية (متعاقدين / ملاك / الكل) — مطابق Ecole.exe
     $cat = $_GET['cat'] ?? 'all';   // all | titulaire | contractuel
     $catSql = '';
-    if ($cat === 'titulaire')   $catSql = " AND employee_type='enseignant_titulaire'";
-    elseif ($cat === 'contractuel') $catSql = " AND employee_type='enseignant_contractuel'";
-    else $catSql = " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')";
+    $catSql = " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')";   // ⚖️ 27/11/2026: الفئة تُحدَّد بعد الجلب من المصدر الواحد empFundKind() (ملاك بلغ 64 = متعاقد عند الصندوق)
     $catTitle = ['titulaire'=>'الداخلين في الملاك', 'contractuel'=>'المتعاقدين'][$cat] ?? 'المتعاقدين والملاك';
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear());
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $catSql . $yf . $ofEmpFilterPlain . "
-                       ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
+                       ORDER BY REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $q->execute($yp);
     $rows = $q->fetchAll();
     $sy = (activeSchoolYear()==='all') ? $schoolYear : activeSchoolYear();
+    usort($rows, fn($a, $b) => (empFundKind($a, $sy) === 'staff' ? 0 : 1) <=> (empFundKind($b, $sy) === 'staff' ? 0 : 1));   // الملاك أوّلاً ثمّ المتعاقدون (الترتيب الأبجدي داخل كل فئة يبقى)
+    if ($cat === 'titulaire' || $cat === 'contractuel') $rows = array_values(array_filter($rows, fn($r) => (empFundKind($r, $sy) === 'staff') === ($cat === 'titulaire')));
     $X = '<span style="font-weight:700">X</span>';
 ?>
     <form method="get" class="card no-print">
@@ -1412,14 +1412,15 @@ elseif ($form === 'teacher_card'):
     // بيان عام — صندوق التعويضات (ملاك / متعاقدين) — طبق نموذج صندوق التعويضات الرسمي
     $cat = ($_GET['cat'] ?? 'titulaire') === 'contractuel' ? 'contractuel' : 'titulaire';
     $isMlk = ($cat === 'titulaire');
-    $typeSql = $isMlk ? "employee_type='enseignant_titulaire'" : "employee_type='enseignant_contractuel'";
+    $typeSql = "employee_type IN ('enseignant_titulaire','enseignant_contractuel')";   // ⚖️ 27/11/2026: الفئة من المصدر الواحد empFundKind() بعد الجلب — ملاك بلغ 64 يطلع ببيان المتعاقدين لا الملاك
     $catTitle = $isMlk ? 'الداخلين في الملاك' : 'المتعاقدين';
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear());
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . " AND $typeSql" . $yf . $ofEmpFilterPlain . "
-                       ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
+                       ORDER BY REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $q->execute($yp);
     $rows = $q->fetchAll();
     $sy = (activeSchoolYear()==='all') ? $schoolYear : activeSchoolYear();
+    $rows = array_values(array_filter($rows, fn($r) => (empFundKind($r, $sy) === 'staff') === $isMlk));
     $X = '<span style="font-weight:700">X</span>';
     $nCols = 17 + compColsCount();   // 🗑️ (2026-10-15 «لا شي») عمود «تعاقد رسمي» للمتعاقدين انشال بطلبه // الأعمدة الثابتة + أعمدة المكوّنات الظاهرة (تتبع «الراتب يشمل»)
 ?>
@@ -1592,6 +1593,9 @@ elseif ($form === 'teacher_card'):
         ORDER BY e.school_id, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $q->execute(array_merge($ofYearParams, [$qYear], $qm));
     $rows = $q->fetchAll();
+    // ⚖️ 27/11/2026 (المصدر الواحد): مَن ليس خاضعاً للصندوق بأيّ شهر من الفصل (ملاك بلغ 64 / ترك الصندوق) لا يظهر بالبيان الفصلي — كبوّابة الصندوق (eocFinancialRows).
+    if ($rows) { $eocE = []; foreach ($db->query("SELECT * FROM employees WHERE id IN (" . implode(',', array_map(fn($r) => (int)$r['id'], $rows)) . ")")->fetchAll() as $x) $eocE[(int)$x['id']] = $x;
+        $rows = array_values(array_filter($rows, function ($r) use ($eocE, $qYear, $qm) { $e = $eocE[(int)$r['id']] ?? null; if (!$e) return true; foreach ($qm as $m_) if (monthSubjectTo($e, 'eoc', (int)$qYear, (int)$m_)) return true; return false; })); }
     // 🤝 (2026-11-16) «الراتب السابق» = قبل الدرجة — قاعدة البيان المالي بصفحة موقع الصندوق نفسها (eocFinancialRows)، لا MAX على أشهر الفصل
     //    (كان يأخذ أساس تشرين الثاني بعد أن صارت الدرجة داخله فيطلع السابق = الحالي: الين منصور 3,560,000 بدل 3,445,000).
     $eocPrevMap = [];

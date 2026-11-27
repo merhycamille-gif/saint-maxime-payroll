@@ -8323,6 +8323,11 @@ check('⚖️ صندوق التعويضات — صفة الأستاذ (empFundKi
     function_exists('empFundKind') && empFundKind($fk64, '2026-2027', '2026-11-27') === 'contract' && empFundKind($fk64, '2025-2026', '2026-06-15') === 'staff' && empFundKind($fk64, '2025-2026', '2026-07-05') === 'contract' && empFundKind($fk64, '2025-2026', '2026-11-27') === 'contract'
     && empFundKind($fk64, '2024-2025', '2026-11-27') === 'staff' && empFundKind($fk63, '2026-2027', '2026-11-27') === 'staff' && empFundKind($fk63, '2026-2027', '2027-08-10') === 'contract' && empFundKind($fk63, '2027-2028', '2026-11-27') === 'contract' && empFundKind($fkC, '2026-2027', '2026-11-27') === 'contract'
     && strpos((string)file_get_contents(__DIR__ . '/../includes/eoc_portal.php'), "'employment_type' => empFundKind(") !== false);
+// ⚖️ 27/11/2026: البيان المالي للصندوق — مَن بلغ 64 ببحر الفصل يُحسَب عنه فقط أشهر ما قبل بلوغه (المصدر الواحد monthSubjectTo)
+$srcEocP = (string)file_get_contents(__DIR__ . '/../includes/eoc_portal.php'); $piT = eocPeriodInfo('202602'); $eT = ['employee_type' => 'enseignant_titulaire', 'birth_date' => '1962-03-07'];
+check('⚖️ صندوق التعويضات — البيان المالي: المحسوم الفصلي = الشهري × أشهر الخضوع فقط (ملاك بلغ 64 بآذار ⇒ شهران من فصل ك2–آذار، وصفر بالفصل التالي)',
+    strpos($srcEocP, "'teacher_q_disc' => \$monthly * \$nMois") !== false && strpos($srcEocP, 'eocFinRecalc($row, $nMois)') !== false
+    && count(array_filter($piT['months'], fn($ym) => monthSubjectTo($eT, 'eoc', (int)$ym[0], (int)$ym[1]))) === 2 && count(array_filter(eocPeriodInfo('202603')['months'], fn($ym) => monthSubjectTo($eT, 'eoc', (int)$ym[0], (int)$ym[1]))) === 0);
 check('🔒 قفل المصدر الواحد (2026-11-26 «بس تصلّح شغلة بالأساس، لحالها تتصلّح بكل البرنامج وبكل التقارير»): كل قاعدة بالسجلّ مكتوبة بمصدرها فقط', !$ru173, $ru173 ? count($ru173) . ' خارج المصدر — أوّلها ' . $ru173[0][1] . ':' . $ru173[0][2] . ' [' . $ru173[0][0] . ']' : count(reglesUniquesRegistre()) . ' قاعدة');
 // لا «قرار مطلوب»: بطاقة الـ64 بلا زرّ «يبقى»، ولا مهمّة «قرار» بلائحة الشغل
 $c173('no-decision-ui', strpos((string)file_get_contents($PROJ . '/includes/age64.php'), '$need = [];') !== false && strpos((string)file_get_contents($PROJ . '/includes/todo.php'), "'بلغوا سنّ الـ64 — قرار'") === false);

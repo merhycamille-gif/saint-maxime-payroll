@@ -346,6 +346,8 @@ function eocFinancialRows(PDO $db, array $ids, string $code, array $data): array
         $prevSal = $pre;
         if ($m !== 10 && $p && round($p['base']) > 0 && round($p['base']) < $prevSal) $prevSal = round($p['base']);
         $monthly = round(($base + $extra) * EOC_RATE);
+        // ⚖️ 27/11/2026 (المصدر الواحد): المحسوم الفصلي = الشهري × عدد أشهر الفصل التي يخضع فيها للصندوق — مَن بلغ 64 (أو ترك الصندوق) ببحر الفصل لا يُحسَب عنه إلّا ما قبل شهر بلوغه (سمر ملحم: آذار 2026 ⇒ شهران لا ثلاثة).
+        $nMois = count(array_filter($pi['months'], fn($ym) => monthSubjectTo($e, 'eoc', (int)$ym[0], (int)$ym[1])));
         // 🔴 نصف الراتب (الدخول في الملاك/الخيار اليدوي) ≈ نصف الأساس ⇒ عمود «نصف راتب»؛ وإلا فالمحسوم للصندوق بالشهر = درجة
         $g = round($s['grade']); $half = 0; $deg = 0;
         if ($g > 0) { if (abs($g - $base / 2) <= 1 || abs($g - ($base + $extra) / 2) <= 1) $half = $g; else $deg = $g; }
@@ -357,12 +359,12 @@ function eocFinancialRows(PDO $db, array $ids, string $code, array $data): array
         $auto = [
             'teacher_no' => trim((string)($e['caisse_number'] ?? '')), 'teacher_name' => eocNameAr($e),
             'previous_salary' => $prevSal, 'current_salary' => $base, 'add_salary' => $extra,
-            'teacher_m_disc' => $monthly, 'teacher_q_disc' => $monthly * count($pi['months']), 'school_q_disc' => $monthly * count($pi['months']),
+            'teacher_m_disc' => $monthly, 'teacher_q_disc' => $monthly * $nMois, 'school_q_disc' => $monthly * $nMois,
             'discount_half_salary' => $half, 'training_degree' => $deg, 'extra_amount' => $half + $deg, 'is_trainee' => (int)!empty($e['eoc_trainee']), 'is_contribution' => (int)!empty($e['eoc_contribution']), 'remarks' => '',
         ];
         $ov = eocOvDiff((array)($data['lines'][(string)$id] ?? []), $auto);
         $row = ['key' => (string)$id, 'src' => 'auto', 'emp_id' => $id, 'auto' => $auto, 'ov' => $ov] + array_replace($auto, array_intersect_key($ov, array_flip(eocFinancialFields())));
-        $rows[] = eocFinRecalc($row);
+        $rows[] = eocFinRecalc($row, $nMois);
     }
     foreach ((array)$data['manual'] as $k => $mrow) { if (!is_array($mrow)) continue; $r = ['key' => (string)$k, 'src' => 'manual', 'emp_id' => 0, 'auto' => [], 'ov' => []] + array_replace(array_fill_keys(eocFinancialFields(), ''), array_intersect_key($mrow, array_flip(eocFinancialFields()))); $rows[] = eocFinRecalc($r, count($pi['months'])); }
     usort($rows, fn($a, $b) => strcmp(eocNorm((string)$a['teacher_name']), eocNorm((string)$b['teacher_name'])));
