@@ -1228,6 +1228,22 @@ function leftDateOfFor(array $emp, string $kind): ?string {
     return $ds ? min($ds) : null;
 }
 /** هل شهر الراتب (year,month) ما زال خاضعاً لجهة معيّنة؟ شهر الترك نفسه يبقى خاضعاً، ويتوقّف من الشهر التالي */
+/**
+ * ⚖️ صفة الأستاذ ببيانات صندوق التعويضات لسنة مدرسية: 'staff' (صفحة الملاك) أو 'contract' (صفحة المتعاقدين) — المصدر الوحيد.
+ * (2026-11-27، المدير: «إذا أستاذ طلع 64 ببطّل اسمو يبيّن بصفحة ملاك الصندوق، ببيّن بصفحة المتعاقدين لو بيعلّم 30 ساعة،
+ *  لأنّ أيّ أستاذ بيكون اسمو بصفحة صندوق التعويضات إجباري بدّك تدفع عنّو».)
+ * (2026-11-27 أيضاً: «إذا أستاذ طلع على 64 ببحر السنة بدّو يصير متعاقد وبينقل اسمو إلى بيان المتعاقدين».)
+ * ⇒ ملاك بلغ 64 = متعاقد عند الصندوق من شهر بلوغه: للسنة الجارية يُنظر لشهر اليوم، لسنة ماضية لآخر شهرها (أيلول)، لسنة قادمة لأوّلها (تشرين الأوّل).
+ * ملفّه وراتبه بالبرنامج لا يتغيّران لحالهما («المتعاقد نحنا منحدّدو»). $asOf (Y-m-d) للفحص فقط.
+ */
+function empFundKind(array $emp, string $schoolYear, ?string $asOf = null): string {
+    if (($emp['employee_type'] ?? '') !== 'enseignant_titulaire') return 'contract';
+    [$y1] = schoolYearToYears($schoolYear); $y1 = (int)$y1;
+    $deb = sprintf('%04d-10', $y1); $fin = sprintf('%04d-09', $y1 + 1); $auj = substr($asOf ?? date('Y-m-d'), 0, 7);
+    $ref = $auj < $deb ? $deb : ($auj > $fin ? $fin : $auj);
+    return titulaireExemptEoc64($emp, (int)substr($ref, 5, 2), (int)substr($ref, 0, 4)) ? 'contract' : 'staff';
+}
+
 function monthSubjectTo(array $emp, string $kind, int $year, int $month): bool {
     // ⚖️ (2026-11-26 «بس تصلّح شغلة بالأساس، لحالها تتصلّح بكل البرنامج وبكل التقارير»): سنّ الـ64 جزء من المصدر الواحد — أيّ شاشة/تقرير/تصريح يسأل «خاضع للصندوق؟» يمرّ من هنا.
     if ($kind === 'eoc' && function_exists('titulaireExemptEoc64') && titulaireExemptEoc64($emp, $month, $year)) return false;   // ⚖️ ملاك بلغ 64

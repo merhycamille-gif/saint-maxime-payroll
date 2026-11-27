@@ -8317,6 +8317,12 @@ $c173('single-source', !monthSubjectTo(['employee_type' => 'enseignant_titulaire
 // 🔒 قفل «المصدر الواحد» (tools/regles_uniques.php): لا قاعدة مكتوبة خارج مصدرها — وإلا لا نشر
 require_once $PROJ . '/tools/regles_uniques.php';
 $ru173 = reglesUniquesVerifier($PROJ);
+// ⚖️ 27/11/2026 (المدير: «إذا أستاذ طلع 64 ببطّل اسمو يبيّن بصفحة ملاك الصندوق، ببيّن بصفحة المتعاقدين»)
+$fk64 = ['employee_type' => 'enseignant_titulaire', 'birth_date' => '1962-07-20']; $fk63 = ['employee_type' => 'enseignant_titulaire', 'birth_date' => '1963-08-01']; $fkC = ['employee_type' => 'enseignant_contractuel', 'birth_date' => '1980-01-01'];
+check('⚖️ صندوق التعويضات — صفة الأستاذ (empFundKind): ملاك بلغ 64 ⇒ صفحة المتعاقدين من شهر بلوغه (ولو ببحر السنة)؛ قبل بلوغه ملاك؛ المتعاقد متعاقد',
+    function_exists('empFundKind') && empFundKind($fk64, '2026-2027', '2026-11-27') === 'contract' && empFundKind($fk64, '2025-2026', '2026-06-15') === 'staff' && empFundKind($fk64, '2025-2026', '2026-07-05') === 'contract' && empFundKind($fk64, '2025-2026', '2026-11-27') === 'contract'
+    && empFundKind($fk64, '2024-2025', '2026-11-27') === 'staff' && empFundKind($fk63, '2026-2027', '2026-11-27') === 'staff' && empFundKind($fk63, '2026-2027', '2027-08-10') === 'contract' && empFundKind($fk63, '2027-2028', '2026-11-27') === 'contract' && empFundKind($fkC, '2026-2027', '2026-11-27') === 'contract'
+    && strpos((string)file_get_contents(__DIR__ . '/../includes/eoc_portal.php'), "'employment_type' => empFundKind(") !== false);
 check('🔒 قفل المصدر الواحد (2026-11-26 «بس تصلّح شغلة بالأساس، لحالها تتصلّح بكل البرنامج وبكل التقارير»): كل قاعدة بالسجلّ مكتوبة بمصدرها فقط', !$ru173, $ru173 ? count($ru173) . ' خارج المصدر — أوّلها ' . $ru173[0][1] . ':' . $ru173[0][2] . ' [' . $ru173[0][0] . ']' : count(reglesUniquesRegistre()) . ' قاعدة');
 // لا «قرار مطلوب»: بطاقة الـ64 بلا زرّ «يبقى»، ولا مهمّة «قرار» بلائحة الشغل
 $c173('no-decision-ui', strpos((string)file_get_contents($PROJ . '/includes/age64.php'), '$need = [];') !== false && strpos((string)file_get_contents($PROJ . '/includes/todo.php'), "'بلغوا سنّ الـ64 — قرار'") === false);

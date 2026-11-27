@@ -274,7 +274,7 @@ function eocGeneralRows(PDO $db, array $ids, string $sy, array $data): array {
         // 🤝 (2026-11-09 «أي تقرير بأي محلّ لازم يكونو مطابقين لبعضهن») بلا راتب تشرين الأول بأساس: نفس قاعدة البيان العام القديم بالحرف (eocGeneralSalaryRow)
         if (!$sal && ($gr = eocGeneralSalaryRow($db, $id, $sy))) $sal = ['base' => (float)$gr['base_plus_echelon_lbp'], 'extra' => (float)$gr['extra_lbp'] + (float)$gr['prime_fixe_lbp']];   // الأساس كما هو بصفّ الراتب (ولو صفراً ⇒ «ناقص») — كخانة «أساس الراتب بعد التدرّج» بالقديم
         $auto = [
-            'employment_type' => $e['employee_type'] === 'enseignant_titulaire' ? 'staff' : 'contract',
+            'employment_type' => empFundKind($e, $sy),   // ⚖️ 27/11/2026: المصدر الواحد — ملاك بلغ 64 ⇒ صفحة المتعاقدين
             'teacher_no' => trim((string)($e['caisse_number'] ?? '')),
             'teacher_name' => eocNameAr($e), 'father_name' => trim((string)($e['father_name_ar'] ?? '')),
             // خانات الصندوق بالملف أوّلاً، وإلا الاستنتاج من الشهادة/المرحلة التي يعلّم فيها

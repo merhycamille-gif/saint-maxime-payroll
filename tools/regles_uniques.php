@@ -26,6 +26,7 @@ function reglesUniquesRegistre(): array {
         ['قوانين الدرجات الاستثنائية', '/FROM\s+exceptional_grades_laws/i', [$F, $C, 'pages/exceptional_laws.php'], 'exceptionalLaws() · exceptionalLaw()'],
         ['سلسلة الرواتب (قراءة مباشرة)', '/FROM\s+salary_scale_2017/i', [$F, $C, 'pages/salary_scales.php'], 'scaleSalaryLBP() · scaleSalaryMap() · scaleRow()'],
         ['شطور ضريبة الدخل', '/FROM\s+tax_brackets\b/i', [$F, $C, 'pages/settings.php', 'pages/state_laws.php', 'pages/tax_brackets.php'], 'دالّة الضريبة بالمحرّك'],
+        ['صفة الأستاذ عند صندوق التعويضات (ملاك / متعاقد)', '/enseignant_titulaire.\s*\?\s*.staff./', [$F], 'empFundKind()'],
         ['فروع الضمان حسب الجنسيّة (غير اللبناني)', '/cnss_br_(maladie|family|eos)\b/', [$F, $C, 'pages/employees.php', 'pages/teacher_form.php', 'includes/annual_slip_data.php'], 'cnssBranchOn()'],
     ];
 }
