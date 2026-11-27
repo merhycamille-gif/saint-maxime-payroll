@@ -38,7 +38,33 @@ function cadreDueEnsureColumns(?PDO $db = null): void {
             }
             setSetting('heal_contract_from_sy_20261127', date('Y-m-d H:i:s'));
         }
+        month13RuleApply($db);
     } catch (Throwable $e) { $done = false; }
+}
+
+/**
+ * 🎁 قاعدة الشهر 13 (المدير 27/11/2026: «عنّا أكتر من سنتين بالمدرسة: إذا بصندوق التعويضات ما في 13، وإذا مش بالصندوق في 13»).
+ * أستاذ دخل قبل سنتين فأكثر، له راتب هذه السنة، وليس على صندوق التعويضات هذه السنة (متعاقد، أو ملاك توقّف صندوقه بالـ64) ⇒ شهر 13 تلقائياً.
+ * مرّة باليوم؛ يضيف فقط (لا يطفئ ما وُضع باليد). المصدر الواحد لـ«على الصندوق» = empFundKind().
+ */
+function month13RuleApply(?PDO $db = null, bool $force = false): array {
+    $db = $db ?: getDB(); $done = [];
+    try {
+        if (!$force && getSetting('month13_rule_day', '') === date('Y-m-d')) return $done;
+        $sy = currentSchoolYear(); $cut = ((int)substr($sy, 0, 4) - 2) . '-10-01';
+        $q = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.left_date_all IS NULL AND COALESCE(e.has_13th_month,0) = 0
+            AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel') AND e.hire_date IS NOT NULL AND e.hire_date <= ?
+            AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND (ms.net_salary_lbp > 0 OR ms.base_plus_echelon_lbp > 0 OR ms.prime_fixe_lbp > 0))");
+        $q->execute([$cut, $sy]);
+        foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $e) {
+            if (empFundKind($e, $sy) === 'staff') continue;   // على الصندوق ⇒ لا شهر 13
+            $db->prepare("UPDATE employees SET has_13th_month = 1, m13_include_extra = 1, m13_include_aide = 1 WHERE id = ?")->execute([(int)$e['id']]);
+            try { logAudit('month13_rule', 'employees', (int)$e['id'], ['has_13th_month' => 0], ['has_13th_month' => 1, 'sy' => $sy]); } catch (Throwable $t) {}
+            $done[] = (int)$e['id'];
+        }
+        setSetting('month13_rule_day', date('Y-m-d'));
+    } catch (Throwable $t) {}
+    return $done;
 }
 
 /** آخر تاريخ دخول للمدرسة يجعل الأستاذ مستحقّاً للملاك بالسنة $y1-$y2 (أكمل سنتين دراسيتين كاملتين). */

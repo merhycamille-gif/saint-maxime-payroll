@@ -4216,8 +4216,8 @@ check('النجاة: علاء شمعون وكلود كامل وكميل مرعي
       "كميل tax=$camTax74");
 $hanan74 = $who74('حنان', 'تحومي');
 $hanNet74 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(net_salary_lbp),0) s FROM monthly_salaries WHERE employee_id=" . (int)$hanan74['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetch();
-check('النجاة: حنان تحومي حتى أيار 2026 (8 أشهر × 27,160,000 = 217,280,000) — كانت مكمَّلة 12 شهراً ثم بقراره 2026-10-03 «شيل حنان تحومي كمان» انشالت حزيران-أيلول (تركت 30/4/2026)',
-      (int)$hanNet74['n'] === 8 && (float)$hanNet74['s'] === 217280000.0, "n={$hanNet74['n']} s={$hanNet74['s']}");
+check('النجاة: حنان تحومي حتى نيسان 2026 (7 أشهر × 27,160,000 = 190,120,000) — تركت 30/4/2026؛ ⚖️ 27/11/2026 قانونه «من تاريخ الترك ببطّل في راتب» ⇒ أيار انشال (كان باقياً بشهر سماح منذ 3/10)',
+      (int)$hanNet74['n'] === 7 && (float)$hanNet74['s'] === 190120000.0, "n={$hanNet74['n']} s={$hanNet74['s']}");
 $aline74 = $who74('الين', 'قاصوف'); $jes74 = $who74('جيسيكا', 'كنعان');
 $jesOct74 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=" . (int)$jes74['id'] . " AND year=2025 AND month=10")->fetchColumn();
 check('النجاة «طابق نفس الاسماء»: غير الخاضعين الزائدين بلا أشهر 2025-2026 (الين قاصوف نموذجاً) + جيسيكا كنعان باقية 11 شهراً من دخولها 1/11/2025 بلا صف تشرين وهمي + نسخة الاسترجاع _ms_bk_najat20260827 موجودة',
@@ -7346,7 +7346,7 @@ $sel152 = preg_match('/<select name="pay_from_month"[^>]*>\s*<option value="10" 
 $sy152s = currentSchoolYear(); $y152 = (int)substr($sy152s, 0, 4);
 $pmBad152 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND status = 'actif' AND left_date_all IS NULL
     AND NOT (COALESCE(payment_months_per_year,10) = 12 OR (hire_date >= '{$y152}-10-01' AND payment_months_per_year = 9 AND pay_from_month = 10 AND pay_to_month = 6))")->fetchColumn();
-$m13Bad152 = (int)$db->query("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.left_date_all IS NULL AND e.employee_type = 'enseignant_contractuel' AND e.hire_date <= '" . ($y152 - 2) . "-10-01' AND COALESCE(e.has_13th_month,0) = 0 AND COALESCE(e.contract_from_sy,'') < '$sy152s'
+$m13Bad152 = (int)$db->query("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.left_date_all IS NULL AND e.employee_type = 'enseignant_contractuel' AND e.hire_date <= '" . ($y152 - 2) . "-10-01' AND COALESCE(e.has_13th_month,0) = 0
     AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = '$sy152s' AND (ms.net_salary_lbp > 0 OR ms.base_plus_echelon_lbp > 0 OR ms.prime_fixe_lbp > 0))")->fetchColumn(); // متعاقد > سنتين **وله راتب هذه السنة** بلا شهر 13
 $healSt152 = (string)getSetting('heal_pm12_20260920', '');
 // بطاقة سنة ماضية بـ10 أشهر مخزّنة: لا صفوف «—» لآب/أيلول
